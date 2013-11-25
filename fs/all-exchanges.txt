@@ -1,0 +1,76 @@
+<<developed: 24>>
+AUSTRALIA	Australian Securities Exchange (ASX) (the primary Australian exchange)
+AUSTRIA		Wiener Börse AG (also known as the Vienna Stock Exchange)
+BELGIUM		Brussels Stock Exchange (BSE)
+CANADA		Toronto Stock Exchange (TSX, formerly TSE) (largest)
+DENMARK		Copenhagen Stock Exchange or CSE
+FINLAND		Helsinki Stock Exchange
+FRANCE		Euronext Paris
+GERMANY		Frankfurt Stock Exchange
+GREECE		Athens Stock Exchange or ASE or ATHEX
+HONG KONG	Hong Kong Stock Exchange (SEHK)
+IRELAND		Irish Stock Exchange (ISE)
+ISRAEL		Tel Aviv Stock Exchange (TASE)
+ITALY		Borsa Italiana S.p.A.
+JAPAN		Tokyo Stock Exchange
+NETHERLANDS	Euronext N.V.
+NEW ZEALAND	New Zealand Exchange
+NORWAY		Oslo Stock Exchange
+PORTUGAL	Euronext Lisbon (PSI-20)
+SINGAPORE	Singapore Exchange Limited (SGX, SGX: S68) 
+SPAIN		Bolsa de Madrid (Spanish pronunciation: ['bolsa ðe 'mað?ið]; Madrid Stock Exchange)
+SWEDEN		Stockholm Stock Exchange
+SWITZERLAND	SIX Swiss Exchange (formerly SWX Swiss Exchange)
+UNITED KINGDOM	London Stock Exchange
+USA			New York Stock Exchange (NYSE)
+
+
+<<Emerging: 23>>
+BRAZIL		São Paulo Stock Exchange (BM&F Bovespa)
+CHILE		Santiago Stock Exchange (SSE)
+CHINA		Shanghai Stock Exchange (SSE)
+COLOMBIA	Bolsa de Valores de Colombia (BVC)
+CZECH REPUBLIC	Prague Stock Exchange (PSE)
+EGYPT		Egyptian Exchange (EGX)
+HUNGARY		Budapest Stock Exchange (BSE)
+INDIA		Bombay Stock Exchange (BSE)
+INDONESIA	Indonesia Stock Exchange
+KOREA		Korea Exchange (KRX)
+MALAYSIA	Kuala Lumpur Stock Exchange (KLSE, Bursa Saham Kuala Lumpur in Malay)
+MEXICO		Bolsa Mexicana de Valores (BMV)
+MOROCCO		Casablanca Stock Exchange
+PERU		Bolsa de Valores de Lima (BVL)
+PHILIPPINES	Philippine Stock Exchange (Filipino: Pamilihang Sapi ng Pilipinas) (PSE: PSE)
+POLAND		Warsaw Stock Exchange (WSE)
+RUSSIA		Moscow Interbank Currency Exchange (MICEX)
+SOUTH AFRICA	Johannesburg Securities Exchange (JSE)
+TAIWAN		Taiwan Stock Exchange Corporation (TSEC)
+THAILAND	Stock Exchange of Thailand (SET)
+TURKEY		Istanbul Stock Exchange (ISE)
+QATAR		Qatar Exchange (formerly the Doha Securities Market)
+UNITED ARAB EMIRATES	Abu Dhabi Securities Market(ADX) & Dubai Financial Market(DFM) for UAEs
+
+<<frontiers: 25>>
+ARGENTINA	Buenos Aires Stock Exchange (BCBA)
+BAHRAIN		Bahrain Stock Exchange(BSE)
+BANGLADESH	Chittagong Stock Exchange (CSE) or 	Dhaka Stock Exchange (DSE)
+BULGARIA	Bulgarian Stock Exchange
+CROATIA		Zagreb Stock Exchange (ZSE)
+ESTONIA		Tallinn Stock Exchange
+JORDAN		Amman Stock Exchange (ASE)
+KAZAKHSTAN	Kazakhstan Stock Exchange (KASE)
+KENYA		Nairobi Stock Exchange
+KUWAIT		Kuwait Stock Exchange(KSE)
+LEBANON		Beirut Stock Exchange
+LITHUANIA	NASDAQ OMX Vilnius
+MAURITIUS	Stock Exchange of Mauritius (SME)
+NIGERIA		Nigeria Stock Exchange (NSE)
+OMAN		Muscat Securities Market (MSM)
+PAKISTAN	Karachi Stock Exchange (KSE)
+ROMANIA		Bucharest Stock Exchange
+SERBIA		Belgrade Stock Exchange (BELEX)
+SLOVENIA	Ljubljana Stock Exchange (LJSE)
+SRI LANKA	Colombo Stock Exchange
+TUNISIA		Bourse de Tunis
+UKRAINE		Ukrainian Exchange
+VIETNAM		Ho Chi Minh Stock Exchange (HSX)
