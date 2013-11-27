@@ -81,7 +81,7 @@ get_fs_tseries <- function(stmt, ids, t0, t1, freq, curr, querysize, output_dir,
         
         if( !wrote.header ){
             # Save the number of date entries for subsequent error checking.
-            num.entries <- length(a_bin_data)
+            num.entries <- length(ids)
             # Initialize the final data structure with the first entry
             #tseries <- a_bin_data
             # Write to the file, header first, erasing the old file if it already exists.

@@ -49,27 +49,27 @@ download_fs_tseries <- function(config_file){
     config <- read_config(config_file)
     
     # moving to local variables.  throws error if the accessed parameter does not exist in the file.
-    PREFIX <- config$prefix
-    OUTPUT_DIR <- config$output_dir
-    FS_PORTFOLIO_OFDB <- config$portfolio_ofdb
+    PREFIX <- config$PREFIX
+    OUTPUT_DIR <- config$OUTPUT_DIR
+    PORTFOLIO_OFDB <- config$PORTFOLIO_OFDB
     T0 <- config$T0
     T1 <- config$T1
-    FS_FUNC_LIST_FILEPATH <- config$params_file
-    CURRENCY = config$currency
-    MAX_COMPANIES <- config$max_companies
+    PARAMS_FILE <- config$PARAMS_FILE
+    CURRENCY = config$CURRENCY
+    MAX_COMPANIES <- config$MAX_COMPANIES
     
     # use 100-500 for monthly, 25-50 for daily.
     #Use lower bound for big universe (e.g. DM, EM)
-    querysize <- config$querysize  
+    QUERY_SIZE <- config$QUERY_SIZE  
     
     #//////////////////////////////////////////////
     
     # Load the universe from FS portfolio
-    df <- FF.ExtractOFDBUniverse(FS_PORTFOLIO_OFDB, "0O")
+    df <- FF.ExtractOFDBUniverse(PORTFOLIO_OFDB, "0O")
     all_ids <- df$Id
     
     # Read the FS function list that comes with frequency
-    stmt_list <- read.table(FS_FUNC_LIST_FILEPATH, sep="=", comment.char="#", strip.white=TRUE, as.is=TRUE)
+    stmt_list <- read.table(PARAMS_FILE, sep="=", comment.char="#", strip.white=TRUE, as.is=TRUE)
     rownames(stmt_list) <- stmt_list[,1] # fs function names
     stmt_list[,1] <- c()
     
@@ -78,16 +78,17 @@ download_fs_tseries <- function(config_file){
     if( DEBUG ) all_ids <- head(all_ids,10001)
     if( DEBUG ) stmt_list <- head(stmt_list,1)
     
-    print(paste("Input file:", FS_FUNC_LIST_FILEPATH))
+    print(paste("Input file:", PARAMS_FILE))
     print(paste("Output dir:", OUTPUT_DIR))
     if( !file.exists(OUTPUT_DIR) ) dir.create(OUTPUT_DIR) #create the output dir if not exists.
-    print(paste("FactSet portfolio:", FS_PORTFOLIO_OFDB))
+    print(paste("FactSet portfolio:", PORTFOLIO_OFDB))
     print(paste("Prefix:", PREFIX))
     print(paste("Time frame:", T0, "-", T1))
     print(paste("Currency:", CURRENCY))
-    print(paste("Num of company all_ids:", length(all_ids)))
+    print(paste("Num of company ids:", length(all_ids)))
     print(paste(cat(head(all_ids,10)), "..."))
-    print(paste("querysize: ", querysize))
+    print(paste("num of companies per query: ", QUERY_SIZE))
+    print(paste("Max companies per file:", MAX_COMPANIES))
     
     ########################
     # Company Basic Info
@@ -133,7 +134,7 @@ download_fs_tseries <- function(config_file){
             started <- proc.time()
             
             # Get the results in xts
-            a_tseries <- get_fs_tseries(stmt, ids, T0, T1, freq, CURRENCY, querysize, OUTPUT_DIR, PREFIX)
+            a_tseries <- get_fs_tseries(stmt, ids, T0, T1, freq, CURRENCY, QUERY_SIZE, OUTPUT_DIR, PREFIX)
             
             # Save in csv
             write.zoo(a_tseries, output_filename, sep=",")
@@ -162,4 +163,12 @@ download_fs_tseries <- function(config_file){
 
 
 
-download_fs_tseries("D:/home/honda/mpg/dummy/download_fs_tseries.conf")
+download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-local.conf")
+download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-fundamentals-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-local.conf")
+download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-fundamentals-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-local.conf")
+download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-fundamentals-usd.conf")
