@@ -73,9 +73,9 @@ download_fs_tseries <- function(config_file){
     rownames(stmt_list) <- stmt_list[,1] # fs function names
     stmt_list[,1] <- c()
     
-    if( DEBUG ) T0 <- "20100101"
-    if( DEBUG ) T1 <- "20100103"
-    if( DEBUG ) all_ids <- head(all_ids,10001)
+    if( DEBUG ) T0 <- "20130101"
+    if( DEBUG ) T1 <- "20130201"
+    if( DEBUG ) all_ids <- head(all_ids,1000)
     if( DEBUG ) stmt_list <- head(stmt_list,1)
     
     print(paste("Input file:", PARAMS_FILE))
@@ -156,19 +156,23 @@ download_fs_tseries <- function(config_file){
             print(paste("Output stored in: ", output_filename, sep=""))
             msg <- paste("Elapsed time for market=<", PREFIX, "> param=<", stmt, "> (", CURRENCY, "): ", (finished-started)["elapsed"], "s", sep="")
             print(msg)
+            gc()
+            rm(a_tseries)
+            gc()
         }
     }
     print("Good bye...")
 }
 
 
+#download_fs_tseries("D:/home/honda/mpg/dummy/download_fs_tseries.conf")
 
-download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-usd.conf")
 download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-local.conf")
-download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-fundamentals-usd.conf")
-download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-usd.conf")
-download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-local.conf")
-download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-fundamentals-usd.conf")
-download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-usd.conf")
-download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-local.conf")
-download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-fundamentals-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-fundamentals-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-local.conf")
+#download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-fundamentals-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-local.conf")
+#download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-fundamentals-usd.conf")

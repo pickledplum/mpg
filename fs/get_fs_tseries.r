@@ -35,6 +35,8 @@
 #####################################################################################
 source("recover_from_tempfile.r")
 get_fs_tseries <- function(stmt, ids, t0, t1, freq, curr, querysize, output_dir, output_prefix) {
+    on.exit(function(temp_fo, error_fo){ close(temp_fo, error_fo)})
+    
     temp_filename <- file.path(output_dir, paste(output_prefix, 
                                                  stmt, 
                                                  freq, 
@@ -44,34 +46,50 @@ get_fs_tseries <- function(stmt, ids, t0, t1, freq, curr, querysize, output_dir,
     # On exit (normal or abnormal), tell the user where to find the temporary file.
     #on.exit(function(temp_filename){ print(paste("Whole/partial results is found in", temp_filename))}, add=FALSE)
     
-    # Collect company IDs of which FQL transactions failed.
-    failed_ids = c(character(0)) 
+    # Number of failed IDs
+    num_failed_ids <- 0
     # Flag to short cut when error occured.
     failed <- FALSE
+    # stores the ids of which transactions are failed.
+    failed_ids_filename <- file.path(output_dir, 
+                                     paste(output_prefix, stmt, "-", freq, "-", curr, ".failed.txt", sep=""))
+    if( file.exists(failed_ids_filename) ){
+        file.remove(failed_ids_filename)
+    }
     # TRUE after the column lables are written to the output file.
     wrote.header <- FALSE
-    # Dataframe to collect t-series by companies.
-    tseries <- xts()
+    # Store the array of dates
+    dates <- list()
     
     # Iterate over company ids, a chunk by chunk.  Pull the entire history (t0 - t1) for each company.
     for( begin in seq(1,length(ids), querysize) ) {
         end <- min(begin+querysize-1, length(ids))
         
         print(paste("(",begin,"-",end,")", "/", length(ids), ") ", "pulling ", freq, " ", stmt, " data for ", ids[begin], " (", curr, ")...", sep=""))
-        a_bin_data <- xts()
-        tryCatch( {
-            a_bin_data <- get_a_bin_data(stmt, ids[begin:end], t0, t1, freq, curr)
-        }, error = function(msg) { 
-            print(paste("Error!", msg))
-            failed <<- TRUE
-            failed_ids <<- c(failed_ids,ids[begin:end]) 
-        }
-        )
-        if( failed ) {
-            print(paste("Skipping", ids[begin], "..."))
-            print(failed_ids)
-            failed <- FALSE
-            next
+        
+        # Query.  A matris is returned when successeful.  NULL if not.
+        a_bin_data <- get_a_bin_data(stmt, ids[begin:end], t0, t1, freq, curr)
+        
+        # Take care of failure case.  Fill the slot with some invalid value.
+        if( length(a_bin_data) < 1 ) {
+            failed_ids <- ids[begin:end]
+            print(paste("Query failed.  Skipping", failed_ids[1], "to", failed_ids[length(failed_ids)], "..."))
+            # log IDs in file
+            error_fo <- file(failed_ids_filename, "a")
+            writeLines(paste(failed_ids, collapse=","), error_fo )
+            close(error_fo)
+            if( !wrote.header ) {
+                warning("Fatal error occured at the first query. Likely network diruption. We are doomed..., bailing out.")
+                stop()
+            }
+            else{
+                # filling with some rediculous number
+                bogus <- -999999
+                print(paste("Filling with", length(dates), bogus, "..."))
+                a_bin_data <- matrix(bogus, length(failed_ids, length(dates)))
+                rownames(a_bin_data) <- failed_ids
+                colnames(a_bin_data) <- dates
+            }
         }
         
         # Write the column lables to the output file
@@ -81,75 +99,89 @@ get_fs_tseries <- function(stmt, ids, t0, t1, freq, curr, querysize, output_dir,
         
         if( !wrote.header ){
             # Save the number of date entries for subsequent error checking.
-            num.entries <- length(ids)
-            # Initialize the final data structure with the first entry
-            #tseries <- a_bin_data
+            total_num_ids <- length(ids)
             # Write to the file, header first, erasing the old file if it already exists.
             temp_fo <- file(temp_filename, open="w")
-            write.table(t(c(num.entries,colnames(t(a_bin_data)))), 
-                        file=temp_fo, 
-                        sep=",", 
-                        row.names=FALSE, 
-                        col.names=FALSE,
-                        quote=FALSE)
+            # The header begins with the total number of companies, followed by
+            # dates.
+            dates <- colnames(a_bin_data)
+            writeLines(paste(c(total_num_ids, dates), collapse=","), temp_fo)
             wrote.header <- TRUE
-            write.table(t(a_bin_data), 
+            write.table(a_bin_data, 
                         file=temp_fo, 
                         append=TRUE, 
                         sep=",", 
                         row.names=TRUE, 
                         col.names=FALSE,
-                        quote=FALSE);
+                        quote=FALSE)
+            close(temp_fo)
         }
         else{
-            # Merge the new company's data to the final t-series
-            #tseries <- merge(tseries, a_bin_data)
             # Append to the file as well.
-            temp_fo <- file(temp_filename, open="a")
-            write.table(t(a_bin_data), 
-                        file=temp_fo, 
+            write.table(a_bin_data, 
+                        file=temp_filename, 
                         append=TRUE, 
                         sep=",", 
-                        row.names=TRUE, col.names=FALSE);
+                        row.names=TRUE, 
+                        col.names=FALSE,
+                        quote=FALSE);
         } 
-        close(temp_fo)
+        
     }
-    if( length(failed_ids) > 0 ) {
-        cat("!!! Failed transactions: ", failed_ids)
-        write(failed_ids, file.path(output_dir, paste(output_prefix, stmt, "-", freq, "-", curr, ".failed.txt", sep="")))
+    if( num_failed_ids > 0 ) {
+        
+        cat("!!! Failed transactions are logged in: ", failed_ids_filename)
     }
     data <- recover_from_tempfile(temp_filename)
     return(data)
 }
 
-# Get the daily price returns from day t0 to t1 for the companies.
-# Used FQL: P_TOTAL_RETURNC()
-# Return a time series (xts).  
-# The data column are labeled by the company ID.
+# Query FF database, and returnt the result as an m by n matrix, where
+# m is the number of IDs and n is the number of dates.
+# The matrix's row names are set to IDs and the column names to dates in YYYY-MM-DD format.
 get_a_bin_data <- function(stmt, ids, t0, t1, freq, curr) {
-    # for testing transaction failure
-    #if( currency == "USD") stop(id)
-    master <- xts()
-    data <- FF.ExtractFormulaHistory(ids,stmt,paste(t0,":",t1, ":",freq), paste("curr=",curr,sep=""))
-    # break the array of data by company IDs
-    is.first <- TRUE
+    
+    # FF returns a data.frame looking like this:
+    #
+    #        Id       Date              val
+    #  1 605860 2012-12-31              NA
+    #  2 605860 2013-01-02              NA
+    #  3 605860 2013-01-03              NA
+    #  4 605860 2013-01-04              NA
+    #  5 605860 2013-01-07              NA
+    #  6 605860 2013-01-08              NA
+    #  .....
+    # 64 605910 2013-12-31      -0.7692277
+    # 65 605910 2013-01-02       1.8087864
+    # 66 605910 2013-01-03       2.2842526
+    # 67 605910 2013-01-04      -0.7444143
+    # 68 605910 2013-01-07       0.5000114
+    # 69 605910 2013-01-08       0.2487421
+    #
+    # For file drop, we will make a matrix that is essentially the transpose of XTS time series.
+    #
+    # Id        2012-12-31  2012-01-02  2012-02-03 ...
+    # 605860            NA          NA          NA ...
+    # ...
+    # 605910    -0.7692277   1.8087864   2.2842526 ...
+    #
+    #
+    tryCatch({
+        data <- FF.ExtractFormulaHistory(ids,stmt,paste(t0,":",t1, ":",freq), paste("curr=",curr,sep=""))
+    }, error=function(msg){
+        print(paste("ERROR!!!", msg))
+        return(NULL)
+    })
+    dates <- as.character(unique(unlist(data$Date)))
+    m <- matrix(double(), length(ids), length(dates))
+    rownames(m) <- ids
+    colnames(m) <- dates
+    i <- 1
     for( id in ids ){
         flags <- data$Id==id
-        a_comp <- data.frame(data[flags,])
-        
-        rownames(a_comp) <- as.Date(a_comp[,2])
-        a_comp$Id <- c()
-        a_comp$Date <- c()
-        colnames(a_comp) <- c(id)
-        
-        x_comp <- as.xts(a_comp)
-        if( is.first ){
-            master <- x_comp
-            is.first <- FALSE
-        } else{
-            master <- merge(master, x_comp)
-        }
+        a_comp <- data[flags,]
+        m[i,] <- unlist(a_comp[,3])
+        i <- i+1
     }
-    
-    return(master)
+    return(m)
 }
