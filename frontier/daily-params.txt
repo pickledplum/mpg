@@ -1,0 +1,3 @@
+# Frontier Market
+# Daily data
+P_TOTAL_RETURNC=D

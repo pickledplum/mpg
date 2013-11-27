@@ -1,0 +1,3 @@
+# Developed Market
+# Daily data
+P_TOTAL_RETURNC=D
