@@ -7,7 +7,7 @@
 # and written/appended to a temporary file in case of a disaster.
 #
 # Inputs
-# - stmt: FactSet formula name. e.g. "P_TOTAL_RETURNC" for compound price return
+# - stmt: FactSet formula. e.g. "P_TOTAL_RETURNC" for compound price return
 # - ids:  list of company IDs.  FactSet IDs, ticker symbols, etc.
 # - t0:   start date.  "YYYYMMDD" for specific data, 0 for most recent, 
 #         -1 for the prior date/month/year
@@ -16,6 +16,9 @@
 #         Valid values are "D","M","Q","Y" for daily, monthly, quarterly and yearly, respectively.
 # - curr: Three letter currency code or "local" for local currency.  
 #         e.g "USD", "local", "EUR"
+# - querysize: the max number of companies per query.
+# - output_dir: Output directory.  Temp files are stored here.
+# - output_prefix: prefix to temporary file names.
 #
 # Outputs: 
 # An xts object containg the time series.
@@ -34,7 +37,7 @@
 #
 #####################################################################################
 source("recover_from_tempfile.r")
-get_fs_tseries <- function(stmt, ids, t0, t1, freq, curr, querysize, output_dir, output_prefix) {
+get_fs_tseries <- function(stmt, ids, t0, t1, freq, curr, querysize, output_dir, output_prefix, output_filename ){
     on.exit(function(temp_fo, error_fo){ close(temp_fo, error_fo)})
     
     temp_filename <- file.path(output_dir, paste(output_prefix, 
@@ -42,6 +45,7 @@ get_fs_tseries <- function(stmt, ids, t0, t1, freq, curr, querysize, output_dir,
                                                  freq, 
                                                  paste(curr, ".tmp.csv", sep=""), 
                                                  sep="-"))
+    temp_filename <- paste(output_filename, ".tmp", sep="")
 
     # On exit (normal or abnormal), tell the user where to find the temporary file.
     #on.exit(function(temp_filename){ print(paste("Whole/partial results is found in", temp_filename))}, add=FALSE)
@@ -86,7 +90,7 @@ get_fs_tseries <- function(stmt, ids, t0, t1, freq, curr, querysize, output_dir,
                 # filling with some rediculous number
                 bogus <- -999999
                 print(paste("Filling with", length(dates), bogus, "..."))
-                a_bin_data <- matrix(bogus, length(failed_ids, length(dates)))
+                a_bin_data <- matrix(bogus, length(failed_ids), length(dates))
                 rownames(a_bin_data) <- failed_ids
                 colnames(a_bin_data) <- dates
             }
@@ -172,15 +176,65 @@ get_a_bin_data <- function(stmt, ids, t0, t1, freq, curr) {
         print(paste("ERROR!!!", msg))
         return(NULL)
     })
-    dates <- as.character(unique(unlist(data$Date)))
+    if( length(data) < 1 ){
+        print("ERROR!  Empty data.  Skipping...")
+        return(NULL)
+    }
+    y0 <- 0
+    y1 <- 0
+    # Yearly data points are made on a company specific date.  So, standardize
+    if( freq == "Y" ){
+        if( as.integer(t1) <= 0 ){
+            t1 <- as.character(Sys.Date() - as.integer(t1))
+            t1 <- paste(unlist(strsplit(t1, "-", fixed=TRUE)), collapse="")
+        }
+        y0 <- as.integer(substr(t0,1,4))
+        y1 <- as.integer(substr(t1,1,4))
+        dates <- as.character(seq(y0, y1, by=1))
+    }
+    else{
+        y0 <- as.integer(substr(t0,1,4))
+        y1 <- as.integer(substr(t1,1,4))
+        dates <- as.character(unique(unlist(data$Date)))
+    }
     m <- matrix(double(), length(ids), length(dates))
     rownames(m) <- ids
     colnames(m) <- dates
+
     i <- 1
     for( id in ids ){
         flags <- data$Id==id
         a_comp <- data[flags,]
-        m[i,] <- unlist(a_comp[,3])
+        vals <- unlist(a_comp[,3])
+        if( length(vals) != length(dates) ){
+            if( freq=="Y"){
+                # the company may not have existed in certains years before or after.
+                # So, align whatever we got to the standarlized years.
+                m[i, ] <- array(double(), dim=length(dates))
+                k <- 1
+                for( timestamp in as.character(a_comp$Date) ){
+                    year <- as.integer(substr(timestamp,1,4))
+                    year_col <- year - y0 + 1
+                    m[i,year_col] <- vals[k]
+                    k <- k+1
+                }
+                
+            }
+            else{
+                print(paste("Warning! FS returned data for", id, "has", length(vals), "but the others have", length(dates)))
+                print(paste(vals, collapse=","))
+                return(NULL)
+            }
+        }
+        else{
+            tryCatch({
+                m[i,] <- unlist(a_comp[,3])
+            }, error=function(msg){
+                print(msg)
+                print("Warning! The length of replacement is not a multiple of m[i,].")
+                return(NULL)
+            })
+        }
         i <- i+1
     }
     return(m)

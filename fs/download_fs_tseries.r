@@ -1,36 +1,78 @@
 #####################################################################
 #
-# Driver for get_fs_tseries()
-# 
 # Download historical data from the FactSet server.
 #
-# Input file: A text file containg <name>=<value> pairs, where 
-# <name> is a FactSet formula that can be called via the 
+# The function takes a path to a configuration file that
+# defines a number of parameters to control queries.
+# 
+#
+#
+# <<<Config File>>>
+# The file contains name-value pairs.  The name in this case is a parameter name that controls
+# the behavior this program.
+# 
+# <Config Paramters>
+#
+# CURRENCY : String - A three letter FactSet currency code or "local" for local currency.  e.g "USD", "EUR"
+# OUTPUT_DIR : String - Directory path to which all outputs are stored. 
+# PORTFOLIO_OFDB : String - FactSet portfolio name
+# PREFIX : String - A sting to be prefixed to all output file names.
+# T0 : String - Staring date.  A double quoted integer.  
+#               A relative date from T1, or an eight digit number in YYYYMMDD format for a specific date.
+# T1 : String - Ending date.  A double quoted integer.
+#               0 for most recent, or a eight digit number in YYYYMMDD format for a specific date.
+# PARAMS_FILE : String - Path to a file listing FactSet paramters to be pulled.
+#               See below for details.
+# QUERY_SIZE : Integer - The maximum number of companies per query.  e.g. 100 to 500 for monthly, 
+#               25 to 50 for daily
+# MAX_COMPANIES : Integer - The maximum number of companies per output file.  
+#               Consider 10000 to be max for a file, or R will blow up.
+#
+# <Example>
+# CURRENCY=USD
+# OUTPUT_DIR = "D:/home/honda/mpg/frontier/fs_output"
+# PORTFOLIO_OFDB = "PERSONAL:HONDA_ALL_FM_BY_EX"
+# PREFIX = "ex-fm"
+# T0 = "19900101"
+# T1 = "0"
+# QUERY_SIZE = 50
+# MAX_COMPANIES = 10000
+#
+# <<<Parameter File>
+# 
+# The file contains name-value pairs, where 
+# the name in this case is a FactSet formula that can be called via the 
 # "FF.ExtractFormulaHistory" FQL statement.
 # <value> is a letter indicating the frequency of data being pulled.
 # Valid letters are "D","M","Q","Y" for daily, monthly, quarterly and yearly
 # prespectively.
+#
+#
+# <<<Return>>>
 # 
-# Output files: A csv for each FactSet formula for each CURRENCYency.
-# Each csv will contain a (n+1) by (m+1) matrix, 
-# where n is the number of data entries pulled (e.g. #of days for daily data,
-# #of moths for monthly data).
+# The program essentially generates a m by n matrix where m is the number of dates
+# and n is the number of companies.  The matrix will be divided into pieces
+# according to MAX_COMPANIES and saved in a file.  For example, if the total number
+# of constituents in a universe defined by PORTFOLIO_OFDB is 10000
+# and MAX_COMPANIES is set to 1000, the matrix will be divided into 10 sub matrices
+# and the first file will contain the first 1000 company data.
+# 
 #
-# The first row contains the company IDs.
-# The first column contains the time stamps.
+# NOTE:
+# Setting "DEBUG" to TRUE in the code will trancate the universe and 
+# print out extra log messages on screen.
 #
-# NOTES:
-# For each FS formula per CURRENCYency, a temporary file is created.
-# The temp file stores on-going transaction results in case of
-# a disaster.  The user can inspect the contents and may pick
-# up from where it is left.  The temp file is created in the
-# same directory as the final result files are stored: OUTPUT_DIR.
-#
-# $Id$
+# $Id:$
 #
 #####################################################################
 library(xts)
 library(FactSetOnDemand)
+
+#//////////////////////////////////////////////
+# CPU Architecture 
+#//////////////////////////////////////////////
+arch <- 32
+
 #//////////////////////////////////////////////
 # Adjustable parameters
 #//////////////////////////////////////////////
@@ -39,8 +81,18 @@ source("get_fs_tseries.r")
 source("read_config.r")
 
 download_fs_tseries <- function(config_file){
-    # Java heap
-    options(java.parameters="-Xmx1000m")
+    
+    if( arch == 32 ){
+        max_heap <- 2047 #MB
+    } else if( arch == 64 ){
+        max_heap <- 2097151 # MB
+    } else{
+        max_heap <- 2047
+    }
+    
+    # Use max heap.  Limit when appropriate
+    max_heap <- min(memory.limit(), max_heap)
+    memory.size(max_heap)
     
     # Query time out.  Default is 120 secs.  120-3600 secs on client side.
     FactSet.setConfigurationItem( FactSet.TIMEOUT, 900 )
@@ -134,7 +186,9 @@ download_fs_tseries <- function(config_file){
             started <- proc.time()
             
             # Get the results in xts
-            a_tseries <- get_fs_tseries(stmt, ids, T0, T1, freq, CURRENCY, QUERY_SIZE, OUTPUT_DIR, PREFIX)
+            a_tseries <- get_fs_tseries(stmt, ids, T0, T1, freq, 
+                                        CURRENCY, QUERY_SIZE, OUTPUT_DIR, PREFIX,
+                                        output_filename)
             
             # Save in csv
             write.zoo(a_tseries, output_filename, sep=",")
@@ -167,12 +221,18 @@ download_fs_tseries <- function(config_file){
 
 #download_fs_tseries("D:/home/honda/mpg/dummy/download_fs_tseries.conf")
 
-#download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-usd.conf")
-download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-local.conf")
-#download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-fundamentals-usd.conf")
+
 #download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-usd.conf")
 #download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-local.conf")
-#download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-fundamentals-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-fundamentals-usd.conf")
+
+ddownload_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-cap-usd.conf")
+
+
+########################
 #download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-usd.conf")
 #download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-local.conf")
 #download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-fundamentals-usd.conf")
+
+#download_fs_tseries("D:/home/honda/mpg/acwi/download_fs_tseries-cap-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-cap-usd.conf")
