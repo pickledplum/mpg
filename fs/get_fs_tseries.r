@@ -190,7 +190,7 @@ get_a_bin_data <- function(stmt, ids, t0, t1, freq, curr) {
         }
         y0 <- as.integer(substr(t0,1,4))
         y1 <- as.integer(substr(t1,1,4))
-        dates <- as.character(seq(y0, y1, by=1))
+        dates <- paste(as.character(seq(y0, y1, by=1)), "-12-31", sep="")
     }
     else{
         y0 <- as.integer(substr(t0,1,4))

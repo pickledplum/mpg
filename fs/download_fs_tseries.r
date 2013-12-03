@@ -79,21 +79,20 @@ arch <- 32
 DEBUG = FALSE
 source("get_fs_tseries.r")
 source("read_config.r")
+if( arch == 32 ){
+    max_heap <- 2047 #MB
+} else if( arch == 64 ){
+    max_heap <- 2097151 # MB
+} else{
+    max_heap <- 2047
+}
+
+# Use max heap.  Limit when appropriate
+max_heap <- min(memory.limit(), max_heap)
+if( memory.size(NA) < max_heap ) memory.size(max_heap)
 
 download_fs_tseries <- function(config_file){
-    
-    if( arch == 32 ){
-        max_heap <- 2047 #MB
-    } else if( arch == 64 ){
-        max_heap <- 2097151 # MB
-    } else{
-        max_heap <- 2047
-    }
-    
-    # Use max heap.  Limit when appropriate
-    max_heap <- min(memory.limit(), max_heap)
-    memory.size(max_heap)
-    
+
     # Query time out.  Default is 120 secs.  120-3600 secs on client side.
     FactSet.setConfigurationItem( FactSet.TIMEOUT, 900 )
     
@@ -125,9 +124,9 @@ download_fs_tseries <- function(config_file){
     rownames(stmt_list) <- stmt_list[,1] # fs function names
     stmt_list[,1] <- c()
     
-    if( DEBUG ) T0 <- "20130101"
-    if( DEBUG ) T1 <- "20130201"
-    if( DEBUG ) all_ids <- head(all_ids,1000)
+    if( DEBUG ) T0 <- "20000101"
+    if( DEBUG ) T1 <- "20131231"
+    if( DEBUG ) all_ids <- head(all_ids,10)
     if( DEBUG ) stmt_list <- head(stmt_list,1)
     
     print(paste("Input file:", PARAMS_FILE))
@@ -224,15 +223,14 @@ download_fs_tseries <- function(config_file){
 
 #download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-usd.conf")
 #download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-local.conf")
-download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-fundamentals-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-fundamentals-usd.conf")
 
-ddownload_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-cap-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-cap-usd.conf")
 
 
 ########################
-#download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-usd.conf")
-#download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-local.conf")
-#download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-fundamentals-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-fundamentals-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-local.conf")
+download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-cap-usd.conf")
 
-#download_fs_tseries("D:/home/honda/mpg/acwi/download_fs_tseries-cap-usd.conf")
-#download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-cap-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/acwi/download_fs_tseries-cap-usd.conf")
