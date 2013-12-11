@@ -1,271 +1,219 @@
 #####################################################################
 #
-# Driver for get_fs_tseries()
-# 
 # Download historical data from the FactSet server.
 #
-# Input file: A text file containg <name>=<value> pairs, where 
-# <name> is a FactSet formula that can be called via the 
+# The function takes a path to a configuration file that
+# defines a number of parameters to control queries.
+# 
+#
+#
+# <<<Config File>>>
+# The file contains name-value pairs.  The name in this case is a parameter name that controls
+# the behavior this program.
+# 
+# <Config Paramters>
+#
+# CURRENCY : String - A three letter FactSet currency code or "local" for local currency.  e.g "USD", "EUR"
+# OUTPUT_DIR : String - Directory path to which all outputs are stored. 
+# PORTFOLIO_OFDB : String - FactSet portfolio name
+# PREFIX : String - A sting to be prefixed to all output file names.
+# T0 : String - Staring date.  A double quoted integer.  
+#               A relative date from T1, or an eight digit number in YYYYMMDD format for a specific date.
+# T1 : String - Ending date.  A double quoted integer.
+#               0 for most recent, or a eight digit number in YYYYMMDD format for a specific date.
+# PARAMS_FILE : String - Path to a file listing FactSet paramters to be pulled.
+#               See below for details.
+# QUERY_SIZE : Integer - The maximum number of companies per query.  e.g. 100 to 500 for monthly, 
+#               25 to 50 for daily
+# MAX_COMPANIES : Integer - The maximum number of companies per output file.  
+#               Consider 10000 to be max for a file, or R will blow up.
+#
+# <Example>
+# CURRENCY=USD
+# OUTPUT_DIR = "D:/home/honda/mpg/frontier/fs_output"
+# PORTFOLIO_OFDB = "PERSONAL:HONDA_ALL_FM_BY_EX"
+# PREFIX = "ex-fm"
+# T0 = "19900101"
+# T1 = "0"
+# QUERY_SIZE = 50
+# MAX_COMPANIES = 10000
+#
+# <<<Parameter File>
+# 
+# The file contains name-value pairs, where 
+# the name in this case is a FactSet formula that can be called via the 
 # "FF.ExtractFormulaHistory" FQL statement.
 # <value> is a letter indicating the frequency of data being pulled.
 # Valid letters are "D","M","Q","Y" for daily, monthly, quarterly and yearly
 # prespectively.
+#
+#
+# <<<Return>>>
 # 
-# Output files: A csv for each FactSet formula for each currency.
-# Each csv will contain a (n+1) by (m+1) matrix, 
-# where n is the number of data entries pulled (e.g. #of days for daily data,
-# #of moths for monthly data).
+# The program essentially generates a m by n matrix where m is the number of dates
+# and n is the number of companies.  The matrix will be divided into pieces
+# according to MAX_COMPANIES and saved in a file.  For example, if the total number
+# of constituents in a universe defined by PORTFOLIO_OFDB is 10000
+# and MAX_COMPANIES is set to 1000, the matrix will be divided into 10 sub matrices
+# and the first file will contain the first 1000 company data.
+# 
 #
-# The first row contains the company IDs.
-# The first column contains the time stamps.
+# NOTE:
+# Setting "DEBUG" to TRUE in the code will trancate the universe and 
+# print out extra log messages on screen.
 #
-# NOTES:
-# For each FS formula per currency, a temporary file is created.
-# The temp file stores on-going transaction results in case of
-# a disaster.  The user can inspect the contents and may pick
-# up from where it is left.  The temp file is created in the
-# same directory as the final result files are stored: OUTPUT_PATH.
-#
-# $Id$
+# $Id:$
 #
 #####################################################################
+library(xts)
+library(FactSetOnDemand)
+
+#//////////////////////////////////////////////
+# CPU Architecture 
+#//////////////////////////////////////////////
+arch <- 32
 
 #//////////////////////////////////////////////
 # Adjustable parameters
 #//////////////////////////////////////////////
 DEBUG = FALSE
-universe = "LARGE" # SMALL, MEDIUM, LARGE
-markets <- c("DM") # "FM", "ACWI", DM", "EM"
-# Currencies
-currencies = c("USD")#, "local")
-binsize <- 100  # use 100-300 for monthly, 25-50 for daily, be conservative
 
-# close log file upon exit 
-on.exit(function(log, a_tseries, output_filepath){ 
-  close(log)
-  write.zoo(a_tseries, output_filepath, sep=",")
-  }, add=FALSE)
 
-# query time out.  default is 120 secs.  120 to 3600
-FactSet.setConfigurationItem(FactSet.TIMEOUT, 900)
-# java heap size
-options(java.parameters="-Xmx1000m")
+source("get_fs_tseries.r")
+source("read_config.r")
 
-for( market in markets ) {
-  # Where the output files and temp files are stored.
-  OUTPUT_PATH=""
-  # FS portfolio that defines the universe.
-  FS_PORTFOLIO_OFDB=""
-  # File prefix used for output files
-  OUTPUT_FILE_PREFIX=""
-  # <name>=<value> list, where <name> is a FS formula and <value> is the data frequency.
-  # See the doc on top of this file.
-  FS_FUNC_LIST_FILEPATH = ""
-  
-  if( market == "ACWI" ) {
-      OUTPUT_PATH = "Q:/temp/honda/mpg/acwi/fs_output"
-      FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_MSCI_ACWI_ETF"
-      OUTPUT_FILE_PREFIX = "etf-acwi-"
-      t0 <- "19800101"
-      # <name>=<value> list, where <name> is a FS formula and <value> is the data frequency.
-      # See the doc on top of this file.
-      FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/acwi/fs-sorted-params.txt"
-  }
-  if( universe == "LARGE") {
-      if( market == "DM" ){
-          OUTPUT_PATH = "Q:/temp/honda/mpg/developed/fs_output"
-          FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_ALL_DM_BY_EX"
-          OUTPUT_FILE_PREFIX = "ex_dm-"
-          t0 <- "19800101"
-          FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/developed/fs-sorted-params.txt"
-      } else if( market == "EM" ){
-          OUTPUT_PATH = "Q:/temp/honda/mpg/emerging/fs_output"
-          FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_ALL_EM_BY_EX"
-          OUTPUT_FILE_PREFIX = "ex-em-"
-          t0 <- "19900101"
-          FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/emerging/fs-sorted-params.txt"
-      } else if( market == "FM") {
-          OUTPUT_PATH = "Q:/temp/honda/mpg/frontier/fs_output"
-          FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_ALL_FM_BY_EX"  #4636
-          OUTPUT_FILE_PREFIX = "ex-fm-"
-          t0 <- "19900101"
-          FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/frontier/fs-sorted-params.txt"
-      }
-  } else if( universe == "MEDIUM" ){
-      if( market == "DM" ){
-          OUTPUT_PATH = "Q:/temp/honda/mpg/developed/fs_output"
-          FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_MSCI_DEVELOPED_ETF"
-          OUTPUT_FILE_PREFIX = "etf_dm-"
-          t0 <- "19800101"
-          FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/developed/fs-sorted-params.txt"
-      } else if( market == "EM" ){
-          OUTPUT_PATH = "Q:/temp/honda/mpg/emerging/fs_output"
-          FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_ALL_EM"
-          OUTPUT_FILE_PREFIX = "all-em-"
-          t0 <- "19900101"
-          FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/emerging/fs-sorted-params.txt"
-      } else if( market == "FM") {
-          OUTPUT_PATH = "Q:/temp/honda/mpg/frontier/fs_output"
-          FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_ALL_FRONTIERS"  
-          OUTPUT_FILE_PREFIX = "all-fm-"
-          t0 <- "19900101"
-          FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/frontier/fs-sorted-params.txt"
-      }
-  } else if( universe == "SMALL" ){
-      if( market == "DM" ){
-          OUTPUT_PATH = "Q:/temp/honda/mpg/developed/fs_output"
-          FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_MSCI_DEVELOPED_ETF"
-          OUTPUT_FILE_PREFIX = "etf_dm-"
-          t0 <- "19800101"
-          FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/developed/fs-sorted-params.txt"
-      } else if( market == "EM" ){
-          OUTPUT_PATH = "Q:/temp/honda/mpg/emerging/fs_output"
-          FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_ALL_EM_ETF"
-          OUTPUT_FILE_PREFIX = "etf-em-"
-          t0 <- "19900101"
-          FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/emerging/fs-sorted-params.txt"
-      } else if( market == "FM") {
-          OUTPUT_PATH = "Q:/temp/honda/mpg/frontier/fs_output"
-          FS_PORTFOLIO_OFDB = "PERSONAL:HONDA_ALL_FM_ETF"  
-          OUTPUT_FILE_PREFIX = "etf-fm-"
-          t0 <- "19900101"  
-          FS_FUNC_LIST_FILEPATH <- "Q:/temp/honda/mpg/frontier/fs-sorted-params.txt"
-      }
-  
-  } else {
-      print(paste("Invalid univeser size: ", universe))
-      return(1)
-  }
-  # History range.  YYYYMMDD for specific date, 0 for most recent
-  t1 = "0"
-  
-  #//////////////////////////////////////////////
-  
-  # The actual body of function.  This file must be in the current working dir.
-  source("get_fs_tseries.r")
-  
-  # Load the universe from FS portfolio
-  ##### FIXMETODO i uncommented two lines directly below here cause the file 
-  ##### wouldn't run since it didn't know what ids was.
-  df <- FF.ExtractOFDBUniverse(FS_PORTFOLIO_OFDB, "0O")
-  ids <- df$Id
-  print("Loaded the universe")
-  # Read the FS function list that comes with frequency
-  stmt_list <- as.matrix(
-      read.table(FS_FUNC_LIST_FILEPATH, sep="=", comment.char="#", strip.white=TRUE, as.is=TRUE),
-      ncol=2)
-  rownames(stmt_list) <- stmt_list[,1] # fs function names
-  stmt_list <- as.list(stmt_list[,2]) # frequency (D,M,Q,Y)
-  
-  if( DEBUG ) t0 = "20100101"
-  if( DEBUG ) ids <- head(ids,3)
-  if( DEBUG ) stmt_list <- head(stmt_list,2)
-  
-  print(paste("Input file:", FS_FUNC_LIST_FILEPATH))
-  print(paste("Output path:", OUTPUT_PATH))
-  if( !file.exists(OUTPUT_PATH) ) dir.create(OUTPUT_PATH) #create the output dir if not exists.
-  print(paste("FactSet portfolio:", FS_PORTFOLIO_OFDB))
-  print(paste("Output file prefix:", OUTPUT_FILE_PREFIX))
-  print(paste("Time frame:", t0, "-", t1))
-  print(paste("Currencies:"))
-  str(currencies, give.attr=FALSE, give.length=FALSE, give.head=FALSE)
-  print(paste("Num of company IDs:", length(ids)))
-  print(paste(cat(head(ids,10)), "..."))
-  
-  ########################
-  # Company Basic Info
-  ########################
-  comp.info <- FF.ExtractDataSnapshot(ids, "FG_COMPANY_NAME(),P_DCOUNTRY()")
-  rownames(comp.info) <- comp.info$Id
-  comp.info$Id <- c()
-  comp.info$Date <- c()
-  info_file <- file.path(OUTPUT_PATH,paste(OUTPUT_FILE_PREFIX, "company-info.txt",sep=""))
-  write.csv(comp.info, info_file)
-  print(paste("Company basic info (id, name, domicile country) are written in: ", info_file))
-  
-  ########################
-  # Time series
-  ########################
-  # Iterate over currencies
-  for( curr in currencies ) {
-  
-      # Iterate over FS statements
-      for( stmt in labels(stmt_list) ) {
-          freq <- stmt_list[stmt]
-  
-          # breaking down company list into smaller chunks, 
-          # or Rstudio chokes up for DM, which has more than 31000 companies.
-          # Rstudio can allocate upto 2.36MB for an array (a continuous memory block).
-          byby <- 10000 #length(ids) #10000
-          for( begin in seq(1, length(ids), by=byby) ) {
-              
-              end <- min( begin+byby-1, length(ids))
-              writeLines("")
-              output_filepath <- file.path(OUTPUT_PATH, 
-                                         paste(OUTPUT_FILE_PREFIX, 
-                                               stmt, 
-                                               "-", 
-                                               freq, 
-                                               "-", 
-                                               curr,
-                                               "-",
-                                               begin,
-                                               "-",
-                                               end,
-                                               ".csv", 
-                                               sep=""))         
-              # open log file every time for appending an entry
-              # so that you can inspect in the meantime.
-              log <- file(file.path(OUTPUT_PATH, paste(OUTPUT_FILE_PREFIX, "log.log", sep="")), open="a")
-            
-              started <- proc.time()
-
-              # Get the results in xts.  This could be big, so keep this in
-              # the inner most loop.
-              a_tseries <- get_fs_tseries(stmt, ids[begin:end], t0, t1, freq, curr, binsize)
-              
-              # Save in csv
-              write.zoo(a_tseries, output_filepath, sep=",")
-              
-              finished <- proc.time()
-                      
-              if( DEBUG ) {
-                  writeLines("")
-                  print("------- See if the live data structure looks good --------------------")
-                  if( length( a_tseries ) > 0 ) {
-                      print(tail(a_tseries)) 
-                  } else {
-                      print("Some jobs failed.  Failed companies are: ")
-                      print(a_tseries)
-                  }
-                  print("--------------------------------------------------------")
-              }
-              writeLines("")
-              print(paste("Output stored in: ", output_filepath, sep=""))
-              msg <- paste("Elapsed time for market=<", market, "> param=<", stmt, "> (", curr, "): ", (finished-started)["elapsed"], "s", sep="")
-              print(msg)
-              writeLines(msg, log)
-              # close log file every time so that you can inspect in the meantime.
-              close(log)
-          }
-      }
+download_fs_tseries <- function(config_file){
+    
+    if( arch == 32 ){
+        max_heap <- 2047 #MB
+    } else if( arch == 64 ){
+        max_heap <- 2097151 # MB
+    } else{
+        max_heap <- 2047
     }
-}
-print("Good bye...")
+    
+    # Use max heap.  Limit when appropriate
+    max_heap <- min(memory.limit(), max_heap)
+    memory.size(max_heap)
+    
+    # Query time out.  Default is 120 secs.  120-3600 secs on client side.
+    FactSet.setConfigurationItem( FactSet.TIMEOUT, 900 )
+    
+    # config parameters
+    config <- read_config(config_file)
+    
+    # moving to local variables.  throws error if the accessed parameter does not exist in the file.
+    PREFIX <- config$PREFIX
+    OUTPUT_DIR <- config$OUTPUT_DIR
+    PORTFOLIO_OFDB <- config$PORTFOLIO_OFDB
+    T0 <- config$T0
+    T1 <- config$T1
+    PARAMS_FILE <- config$PARAMS_FILE
+    CURRENCY = config$CURRENCY
+    MAX_COMPANIES <- config$MAX_COMPANIES
+    
+    # use 100-500 for monthly, 25-50 for daily.
+    #Use lower bound for big universe (e.g. DM, EM)
+    QUERY_SIZE <- config$QUERY_SIZE  
+    
+    #//////////////////////////////////////////////
+    
+    # Load the universe from FS portfolio
+    df <- FF.ExtractOFDBUniverse(PORTFOLIO_OFDB, "0O")
+    all_ids <- df$Id
+    
+    # Read the FS function list that comes with frequency
+    stmt_list <- read.table(PARAMS_FILE, sep="=", comment.char="#", strip.white=TRUE, as.is=TRUE)
+    rownames(stmt_list) <- stmt_list[,1] # fs function names
+    stmt_list[,1] <- c()
+    
+    if( DEBUG ) T0 <- "20130101"
+    if( DEBUG ) T1 <- "20130201"
+    if( DEBUG ) all_ids <- head(all_ids,1000)
+    if( DEBUG ) stmt_list <- head(stmt_list,1)
+    
+    print(paste("Input file:", PARAMS_FILE))
+    print(paste("Output dir:", OUTPUT_DIR))
+    if( !file.exists(OUTPUT_DIR) ) dir.create(OUTPUT_DIR) #create the output dir if not exists.
+    print(paste("FactSet portfolio:", PORTFOLIO_OFDB))
+    print(paste("Prefix:", PREFIX))
+    print(paste("Time frame:", T0, "-", T1))
+    print(paste("Currency:", CURRENCY))
+    print(paste("Num of company ids:", length(all_ids)))
+    print(paste(cat(head(all_ids,10)), "..."))
+    print(paste("num of companies per query: ", QUERY_SIZE))
+    print(paste("Max companies per file:", MAX_COMPANIES))
+    
+    ########################
+    # Company Basic Info
+    ########################
+    comp.info <- FF.ExtractDataSnapshot(all_ids, "FG_COMPANY_NAME(),P_DCOUNTRY()")
+    rownames(comp.info) <- comp.info$Id
+    comp.info$Id <- c()
+    comp.info$Date <- c()
+    info_file <- file.path(OUTPUT_DIR,paste(PREFIX, "company-info.txt",sep="-"))
+    write.csv(comp.info, info_file)
+    print(paste("Company basic info (id, name, domicile country) are written in: ", info_file))
+    
+    ########################
+    # Time series
+    ########################
+    
+    # Iterate over FS statements
+    for( stmt in rownames(stmt_list) ) {
+        freq <- stmt_list[stmt,1]
 
-#
-# Recover the whole or partial results from the temporary file.
-#
-# recover_from_tempfile <- function(temp_filepath) {
-#     tmp <- read.table(temp_filepath,header=FALSE,sep=",",colClasses=c("character"))
-#     colnames(tmp) <- tmp[1,]
-#     tmp <- subset(tmp, ID!="ID")
-#     rownames(tmp) <- tmp[,1]
-#     tmp$ID <- c()
-#     tmp <- t(tmp)
-#     ncols <- ncol(tmp)
-#     nrows <- nrow(tmp)
-#     print(paste("matrix",nrows,"x",ncols))
-#     tmp <- matrix(as.numeric(tmp),nrow=nrows,ncol=ncols,dimnames=list(rownames(tmp),colnames(tmp)))
-#     return(as.xts(tmp))
-# }
+        for( company_index0 in seq(1, length(all_ids), MAX_COMPANIES )) {
+            company_index1 <- min(length(all_ids), company_index0 + MAX_COMPANIES - 1)
+            ids <- all_ids[company_index0:company_index1]
+            
+            writeLines("")
+            output_filename <- file.path(OUTPUT_DIR, 
+                                         paste(PREFIX, 
+                                               stmt, 
+                                               freq, 
+                                               CURRENCY,
+                                               company_index0,
+                                               paste(company_index1, ".csv", sep=""), 
+                                               sep="-"))         
+            if( file.exists(output_filename) ){
+                # Warn them
+                secs <- 5
+                print(paste("File already exists:", output_filename ))
+                print(paste("Terminate the program in", secs, "seconds, or the file will be overwritten."))
+                Sys.sleep(secs) # give the user a chance to interrupt execution
+                print(paste(output_filename, " is overwritten."))
+            }
+            
+            started <- proc.time()
+            
+            # Get the results in xts
+            a_tseries <- get_fs_tseries(stmt, ids, T0, T1, freq, CURRENCY, QUERY_SIZE, OUTPUT_DIR, PREFIX)
+            
+            # Save in csv
+            write.zoo(a_tseries, output_filename, sep=",")
+            
+            finished <- proc.time()
+                    
+            if( DEBUG ) {
+                writeLines("")
+                print("------- See if the live data structure looks good --------------------")
+                if( length( a_tseries ) > 0 ) {
+                    print(tail(a_tseries)) 
+                } else {
+                    print("Some jobs failed.  Failed companies are: ")
+                    print(a_tseries)
+                }
+                print("--------------------------------------------------------")
+            }
+            writeLines("")
+            print(paste("Output stored in: ", output_filename, sep=""))
+            msg <- paste("Elapsed time for market=<", PREFIX, "> param=<", stmt, "> (", CURRENCY, "): ", (finished-started)["elapsed"], "s", sep="")
+            print(msg)
+            gc()
+            rm(a_tseries)
+            gc()
+        }
+    }
+    print("Good bye...")
+}

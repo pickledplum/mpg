@@ -144,13 +144,15 @@ download_fs_tseries <- function(config_file){
     ########################
     # Company Basic Info
     ########################
-    comp.info <- FF.ExtractDataSnapshot(all_ids, "FG_COMPANY_NAME(),P_DCOUNTRY()")
+    comp.info <- FF.ExtractDataSnapshot(all_ids, "FG_COMPANY_NAME,P_DCOUNTRY,P_REGION,P_EXCHANGE,P_CURRENCY,P_CURRENCY_CODE")
     rownames(comp.info) <- comp.info$Id
     comp.info$Id <- c()
     comp.info$Date <- c()
     info_file <- file.path(OUTPUT_DIR,paste(PREFIX, "company-info.txt",sep="-"))
     write.csv(comp.info, info_file)
     print(paste("Company basic info (id, name, domicile country) are written in: ", info_file))
+    
+    return(0)
     
     ########################
     # Time series
@@ -217,20 +219,7 @@ download_fs_tseries <- function(config_file){
     print("Good bye...")
 }
 
-
-#download_fs_tseries("D:/home/honda/mpg/dummy/download_fs_tseries.conf")
-
-
-#download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-usd.conf")
-#download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-local.conf")
-#download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-fundamentals-usd.conf")
-
-#download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-cap-usd.conf")
-
-
-########################
-download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-fundamentals-usd.conf")
-download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-local.conf")
+download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-cap-usd.conf")
+download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-cap-usd.conf")
 download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-cap-usd.conf")
-
 download_fs_tseries("D:/home/honda/mpg/acwi/download_fs_tseries-cap-usd.conf")

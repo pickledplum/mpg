@@ -56,7 +56,7 @@ get_fs_tseries <- function(stmt, ids, t0, t1, freq, curr, querysize, output_dir,
     failed <- FALSE
     # stores the ids of which transactions are failed.
     failed_ids_filename <- file.path(output_dir, 
-                                     paste(output_prefix, stmt, "-", freq, "-", curr, ".failed.txt", sep=""))
+                                     paste(output_prefix, "-", stmt, "-", freq, "-", curr, ".failed.txt", sep=""))
     if( file.exists(failed_ids_filename) ){
         file.remove(failed_ids_filename)
     }

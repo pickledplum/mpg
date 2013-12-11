@@ -38,8 +38,8 @@ update_tseries <- function(config_file) {
             break
         }
         
-        fullname <- file.path(output_dir, filename)
-        fin <- file(fullname, 'r')
+        input_fullname <- file.path(output_dir, filename)
+        fin <- file(input_fullname, 'r')
         ids <- read.table(fin, sep=",", nrows=1, colClasses="character")
         ids <- ids[2:length(ids)]
     
@@ -65,15 +65,28 @@ update_tseries <- function(config_file) {
         
         started <- proc.time()
         
-        patch <- get_fs_tseries(para, ids, t0, t1,freq,curr, length(ids), output_dir, output_prefix, fullname) 
-        write.zoo(patch, file.path(output_dir, output_filename), sep=",")
+        patch <- get_fs_tseries(para, ids, t0, t1,freq,curr, length(ids), output_dir, output_prefix, input_fullname) 
+        output_fullpath <- file.path(output_dir, output_filename)
+        write.zoo(patch, output_fullpath, sep=",")
         
         finished <- proc.time()
         
         print(paste("Output stored in: ", output_filename, sep=""))
         msg <- paste("Elapsed time for market=<", output_prefix, "> param=<", para, "> (", curr, "): ", (finished-started)["elapsed"], "s", sep="")
-        print(msg)
         
+        append_updates(input_fullpath, output_fullpath)
     }
+}
+append_updates(target_filename, patch_filename){
+    target <- file(target_filename, "a")
+    patch <- file(patch_filename, "r")
+    header <- readLines(patch, n=1)
+    while(TRUE){
+        line <- readLines(patch, n=1)
+        if( length(line) < 1 ) break
+        writeLines(line, target)
+    }
+    close(target)
+    close(patch)
 }
 update_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-cap-usd.conf")
