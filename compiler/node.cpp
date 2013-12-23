@@ -20,7 +20,8 @@ Terminal::Terminal()
 {}
 Terminal::Terminal(float value) 
 : value(value) 
-{}
+{
+}
 Terminal::~Terminal() 
 {}
 void Terminal::setValue( float value ) 
@@ -35,41 +36,33 @@ Numeric::~Numeric()
 {}
 float Numeric::eval() 
 {
-	printf("[%f] ", value);
 	return value; 
 }
-Identifier::Identifier( const std::string& name, float value ) 
+FSParam::FSParam( const std::string& name, float value ) 
 : Terminal(value), name(name) 
-{}
-Identifier::Identifier( const std::string& name ) 
+{
+}
+FSParam::FSParam( const std::string& name ) 
 : name(name) 
-{}
-float Identifier::eval() 
+{
+}
+float FSParam::eval() 
 { 
-	printf("<%f> ", value);
 	return value; 
 }
-Identifier::~Identifier()
+FSParam::~FSParam()
 {}
-Literal::Literal(Terminal& term) 
-: term(term)
-{}
-float Literal::eval()
-{ 
-	return term.eval(); 
-}
-Literal::~Literal()
-{}
-BinaryOperator::BinaryOperator(Expression & lhs, char op, Expression & rhs) 
+BinaryOperator::BinaryOperator(Node & lhs, char op, Node & rhs) 
 : lhs(lhs),op(op),rhs(rhs) 
-{}
+{
+}
+
 BinaryOperator::~BinaryOperator()
 {}
 float BinaryOperator::eval() 
 {
 	float l = lhs.eval();
 	float r = rhs.eval();
-	printf("(%f %c %f) ", l, op, r);
 	switch(op) {
 		case '-': return lhs.eval() - rhs.eval();
 		case '+':  return lhs.eval() + rhs.eval();
@@ -77,7 +70,8 @@ float BinaryOperator::eval()
 		case '*':   return lhs.eval() * rhs.eval();
 	}
 }
-UnaryFunction::UnaryFunction(const std::string& op, Expression& expr) 
+
+UnaryFunction::UnaryFunction(const std::string& op, Node& expr) 
 : op(op), expr(expr) 
 {}
 UnaryFunction::~UnaryFunction()
@@ -85,11 +79,11 @@ UnaryFunction::~UnaryFunction()
 float UnaryFunction::eval() 
 {
 	float val = expr.eval();
-	printf("%s(%f) ", op.c_str(), val);
 	if( op == "ABS" ) return fabs(expr.eval());
 	throw op;
 }
-BinaryFunction::BinaryFunction(Expression& lhs, const std::string& op, Expression& rhs)
+
+BinaryFunction::BinaryFunction(const std::string& op, Node& lhs, Node& rhs)
 : lhs(lhs),op(op),rhs(rhs){}
 BinaryFunction::~BinaryFunction()
 {}
@@ -97,7 +91,6 @@ float BinaryFunction::eval()
 {
 	float l = lhs.eval();
 	float r = rhs.eval();
-	printf("%s(%f,%f) ", op.c_str(), l, r);
 	if( op == "MAX" ) return std::max(l,r);
 	if( op == "MIN" ) return std::min(l,r);
 	throw op;

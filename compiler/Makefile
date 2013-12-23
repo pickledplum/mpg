@@ -1,5 +1,5 @@
-YACC_DEBUG=--verbose --debug
-LEX_DEBUG=--verbose --debug
+YACC_DEBUG=#--verbose --debug
+LEX_DEBUG=#--verbose --debug
 all: parser
 
 clean:

@@ -4,9 +4,9 @@
 #include <iostream>
 #include <string>
 #include <map>
-class Identifier;
+class FSParam;
 
-typedef std::map<std::string, Identifier*> SymbolTable;
+typedef std::map<std::string, FSParam*> SymbolTable;
 void print_table( const SymbolTable & table );
 		
 class Node {
@@ -35,14 +35,15 @@ public:
 	virtual ~Numeric();
 };
 
-class Identifier : public Terminal {
+class FSParam : public Terminal {
 public:
 	std::string name;
-	Identifier( const std::string& name, float value );
-	Identifier( const std::string& name );
+	FSParam( const std::string& name, float value );
+	FSParam( const std::string& name );
 	virtual float eval();
-	virtual ~Identifier();
+	virtual ~FSParam();
 };
+/*
 class Literal : public Expression {
 public:
 	Terminal & term;
@@ -50,30 +51,34 @@ public:
 	virtual float eval();
 	virtual ~Literal();
 };
+*/
 class BinaryOperator : public Expression {
 public:
 	char op;
-	Expression &lhs;
-	Expression &rhs;
-	BinaryOperator(Expression & lhs, char op, Expression & rhs);
+	Node &lhs;
+	Node &rhs;
+	BinaryOperator(Node & lhs, char op, Node & rhs);
 	virtual ~BinaryOperator();
 	virtual float eval();
 };
+
 class UnaryFunction : public Expression {
 public:
 	std::string op;
-	Expression &expr;
-	UnaryFunction(const std::string& op, Expression& expr);
+	Node &expr;
+	UnaryFunction(const std::string& op, Node& expr);
 	virtual ~UnaryFunction();
 	virtual float eval() ;
 };
+
 class BinaryFunction : public Expression {
 public:
 	std::string op;
-	Expression &lhs;
-	Expression &rhs;
-	BinaryFunction(Expression& lhs, const std::string& op, Expression& rhs);
+	Node &lhs;
+	Node &rhs;
+	BinaryFunction(const std::string& op, Node& lhs, Node& rhs);
 	virtual ~BinaryFunction();
 	virtual float eval() ;
 };
+
 #endif

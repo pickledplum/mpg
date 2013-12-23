@@ -9,21 +9,20 @@ extern "C" int yywrap() { }
 %}
 
 %%
-"\n"					return TOKEN(END);
-[ \t]			;
+[ \n\t]			;
 "ABS"					STRING_TOKEN; return ABS;
 "MAX"					STRING_TOKEN; return MAX;
 "MIN"					STRING_TOKEN; return MIN;
-[a-zA-Z_][a-zA-Z0-9_]*	STRING_TOKEN; return IDENTIFIER;
+[a-zA-Z_][a-zA-Z0-9_]*	STRING_TOKEN; return FSPARAM;
 [0-9]+\.[0-9]*			STRING_TOKEN; return DOUBLE;
 [0-9]+					STRING_TOKEN; return INTEGER;
 "("						return TOKEN(LPAREN);
 ")"						return TOKEN(RPAREN);
-","						return TOKEN(COMMA);
 "+"						CHAR_TOKEN(PLUS); return PLUS;
 "-"						CHAR_TOKEN(MINUS); return MINUS;
 "*"						CHAR_TOKEN(MUL); return MUL;
 "/"						CHAR_TOKEN(DIV); return DIV;
+","						return TOKEN(COMMA);
 .						printf("Unknown token!\n"); yyterminate();
 
 %%
