@@ -1,0 +1,3 @@
+# Frontier Market
+# Yearly data
+FF_WKCAP=Y
