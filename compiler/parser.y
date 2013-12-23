@@ -33,8 +33,15 @@
 %%
 input : { g_symbol_table = new SymbolTable(); } expr
 	{ 
-		g_expr = $2;
-		printf("\nBefore substitution... %f\n", $2->eval()); 
+		g_expr = $2;	
+		// There must be at least one FSPARAM in the table.
+
+		if( g_symbol_table->size() < 1 ) {
+			yyerror("Missing a FS parameter");
+			YYERROR;
+		}
+			
+
 		printf("Leaving yyparse()\n");
 		YYACCEPT;
 	}

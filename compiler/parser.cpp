@@ -474,9 +474,9 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint8 yyrline[] =
 {
-       0,    34,    34,    34,    43,    45,    46,    48,    48,    50,
-      51,    52,    53,    54,    55,    56,    57,    58,    62,    65,
-      65
+       0,    34,    34,    34,    50,    52,    53,    55,    55,    57,
+      58,    59,    60,    61,    62,    63,    64,    65,    69,    72,
+      72
 };
 #endif
 
@@ -1388,8 +1388,15 @@ yyreduce:
 /* Line 1787 of yacc.c  */
 #line 35 "parser.y"
     { 
-		g_expr = (yyvsp[(2) - (2)].node);
-		printf("\nBefore substitution... %f\n", (yyvsp[(2) - (2)].node)->eval()); 
+		g_expr = (yyvsp[(2) - (2)].node);	
+		// There must be at least one FSPARAM in the table.
+
+		if( g_symbol_table->size() < 1 ) {
+			yyerror("Missing a FS parameter");
+			YYERROR;
+		}
+			
+
 		printf("Leaving yyparse()\n");
 		YYACCEPT;
 	}
@@ -1397,73 +1404,73 @@ yyreduce:
 
   case 4:
 /* Line 1787 of yacc.c  */
-#line 43 "parser.y"
+#line 50 "parser.y"
     { FSParam* fsparam = new FSParam(*(yyvsp[(1) - (1)].string));  (*g_symbol_table)[*(yyvsp[(1) - (1)].string)] = fsparam;  (yyval.node) = fsparam; }
     break;
 
   case 5:
 /* Line 1787 of yacc.c  */
-#line 45 "parser.y"
+#line 52 "parser.y"
     { (yyval.node) = new Numeric(atoi((yyvsp[(1) - (1)].string)->c_str())); delete (yyvsp[(1) - (1)].string); }
     break;
 
   case 6:
 /* Line 1787 of yacc.c  */
-#line 46 "parser.y"
+#line 53 "parser.y"
     { (yyval.node) = new Numeric(atof((yyvsp[(1) - (1)].string)->c_str())); delete (yyvsp[(1) - (1)].string); }
     break;
 
   case 10:
 /* Line 1787 of yacc.c  */
-#line 51 "parser.y"
+#line 58 "parser.y"
     { (yyval.node) = new BinaryOperator((yyvsp[(1) - (3)].node),(yyvsp[(2) - (3)].character),(yyvsp[(3) - (3)].node)); }
     break;
 
   case 11:
 /* Line 1787 of yacc.c  */
-#line 52 "parser.y"
+#line 59 "parser.y"
     { (yyval.node) = new BinaryOperator((yyvsp[(1) - (3)].node),(yyvsp[(2) - (3)].character),(yyvsp[(3) - (3)].node)); }
     break;
 
   case 12:
 /* Line 1787 of yacc.c  */
-#line 53 "parser.y"
+#line 60 "parser.y"
     { (yyval.node) = new BinaryOperator((yyvsp[(1) - (3)].node),(yyvsp[(2) - (3)].character),(yyvsp[(3) - (3)].node)); }
     break;
 
   case 13:
 /* Line 1787 of yacc.c  */
-#line 54 "parser.y"
+#line 61 "parser.y"
     { (yyval.node) = new BinaryOperator((yyvsp[(1) - (3)].node),(yyvsp[(2) - (3)].character),(yyvsp[(3) - (3)].node)); }
     break;
 
   case 14:
 /* Line 1787 of yacc.c  */
-#line 55 "parser.y"
+#line 62 "parser.y"
     { (yyval.node) = new BinaryOperator( new Numeric(-1), '*', (yyvsp[(2) - (2)].node)); }
     break;
 
   case 15:
 /* Line 1787 of yacc.c  */
-#line 56 "parser.y"
+#line 63 "parser.y"
     { (yyval.node) = (yyvsp[(2) - (3)].node); }
     break;
 
   case 16:
 /* Line 1787 of yacc.c  */
-#line 57 "parser.y"
+#line 64 "parser.y"
     { (yyval.node) = new UnaryFunction(*(yyvsp[(1) - (4)].string), (yyvsp[(3) - (4)].node)); }
     break;
 
   case 17:
 /* Line 1787 of yacc.c  */
-#line 58 "parser.y"
+#line 65 "parser.y"
     { (yyval.node) = new BinaryFunction(*(yyvsp[(1) - (6)].string),(yyvsp[(3) - (6)].node),(yyvsp[(5) - (6)].node)); }
     break;
 
 
 /* Line 1787 of yacc.c  */
-#line 1467 "parser.cpp"
+#line 1474 "parser.cpp"
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -1695,5 +1702,5 @@ yyreturn:
 
 
 /* Line 2050 of yacc.c  */
-#line 67 "parser.y"
+#line 74 "parser.y"
 
