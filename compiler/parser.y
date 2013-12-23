@@ -61,8 +61,8 @@ expr :  terminal
 	| expr MINUS expr { $$ = new BinaryOperator($1,$2,$3); }
 	| MINUS expr %prec NEG { $$ = new BinaryOperator( new Numeric(-1), '*', $2); }
 	| LPAREN expr RPAREN { $$ = $2; }
-	| unary_func LPAREN expr RPAREN { $$ = new UnaryFunction(*$1, $3); }
-	| binary_func LPAREN expr COMMA expr RPAREN { $$ = new BinaryFunction(*$1,$3,$5); }
+	| unary_func LPAREN expr RPAREN { $$ = new UnaryFunction(*$1, $3);  delete $1; }
+	| binary_func LPAREN expr COMMA expr RPAREN { $$ = new BinaryFunction(*$1,$3,$5);  delete $1; }
 	;
 
 unary_func :

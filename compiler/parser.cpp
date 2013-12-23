@@ -1459,13 +1459,13 @@ yyreduce:
   case 16:
 /* Line 1787 of yacc.c  */
 #line 64 "parser.y"
-    { (yyval.node) = new UnaryFunction(*(yyvsp[(1) - (4)].string), (yyvsp[(3) - (4)].node)); }
+    { (yyval.node) = new UnaryFunction(*(yyvsp[(1) - (4)].string), (yyvsp[(3) - (4)].node));  delete (yyvsp[(1) - (4)].string); }
     break;
 
   case 17:
 /* Line 1787 of yacc.c  */
 #line 65 "parser.y"
-    { (yyval.node) = new BinaryFunction(*(yyvsp[(1) - (6)].string),(yyvsp[(3) - (6)].node),(yyvsp[(5) - (6)].node)); }
+    { (yyval.node) = new BinaryFunction(*(yyvsp[(1) - (6)].string),(yyvsp[(3) - (6)].node),(yyvsp[(5) - (6)].node));  delete (yyvsp[(1) - (6)].string); }
     break;
 
 
