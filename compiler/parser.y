@@ -48,14 +48,14 @@ number : INTEGER { $$ = new Numeric(atoi($1->c_str())); delete $1; }
 terminal : param | number
 	;
 expr :  terminal
-	| expr DIV expr { $$ = new BinaryOperator(*$1,$2,*$3); }
-	| expr MUL expr { $$ = new BinaryOperator(*$1,$2,*$3); }
-	| expr PLUS expr { $$ = new BinaryOperator(*$1,$2,*$3); }
-	| expr MINUS expr { $$ = new BinaryOperator(*$1,$2,*$3); }
-	| MINUS expr %prec NEG { $$ = new BinaryOperator( *(new Numeric(-1)), '*', *$2); }
+	| expr DIV expr { $$ = new BinaryOperator($1,$2,$3); }
+	| expr MUL expr { $$ = new BinaryOperator($1,$2,$3); }
+	| expr PLUS expr { $$ = new BinaryOperator($1,$2,$3); }
+	| expr MINUS expr { $$ = new BinaryOperator($1,$2,$3); }
+	| MINUS expr %prec NEG { $$ = new BinaryOperator( new Numeric(-1), '*', $2); }
 	| LPAREN expr RPAREN { $$ = $2; }
-	| unary_func LPAREN expr RPAREN { $$ = new UnaryFunction(*$1, *$3); }
-	| binary_func LPAREN expr COMMA expr RPAREN { $$ = new BinaryFunction(*$1,*$3,*$5); }
+	| unary_func LPAREN expr RPAREN { $$ = new UnaryFunction(*$1, $3); }
+	| binary_func LPAREN expr COMMA expr RPAREN { $$ = new BinaryFunction(*$1,$3,$5); }
 	;
 
 unary_func :

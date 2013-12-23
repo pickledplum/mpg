@@ -43,21 +43,13 @@ public:
 	virtual float eval();
 	virtual ~FSParam();
 };
-/*
-class Literal : public Expression {
-public:
-	Terminal & term;
-	Literal(Terminal& term);
-	virtual float eval();
-	virtual ~Literal();
-};
-*/
+
 class BinaryOperator : public Expression {
 public:
 	char op;
-	Node &lhs;
-	Node &rhs;
-	BinaryOperator(Node & lhs, char op, Node & rhs);
+	Node *lhs;
+	Node *rhs;
+	BinaryOperator(Node * lhs, char op, Node * rhs);
 	virtual ~BinaryOperator();
 	virtual float eval();
 };
@@ -65,8 +57,8 @@ public:
 class UnaryFunction : public Expression {
 public:
 	std::string op;
-	Node &expr;
-	UnaryFunction(const std::string& op, Node& expr);
+	Node *expr;
+	UnaryFunction(const std::string& op, Node* expr);
 	virtual ~UnaryFunction();
 	virtual float eval() ;
 };
@@ -74,9 +66,9 @@ public:
 class BinaryFunction : public Expression {
 public:
 	std::string op;
-	Node &lhs;
-	Node &rhs;
-	BinaryFunction(const std::string& op, Node& lhs, Node& rhs);
+	Node *lhs;
+	Node *rhs;
+	BinaryFunction(const std::string& op, Node* lhs, Node* rhs);
 	virtual ~BinaryFunction();
 	virtual float eval() ;
 };
