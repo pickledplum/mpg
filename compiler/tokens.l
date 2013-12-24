@@ -1,5 +1,6 @@
 %{
-#include <string.h>
+#include <cstdio>
+#include <string>
 #include "node.h"
 #include "parser.hpp"
 #define STRING_TOKEN yylval.string = new std::string(yytext,yyleng);

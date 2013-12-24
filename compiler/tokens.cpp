@@ -464,14 +464,15 @@ int yy_flex_debug = 0;
 char *yytext;
 #line 1 "tokens.l"
 #line 2 "tokens.l"
-#include <string.h>
+#include <cstdio>
+#include <string>
 #include "node.h"
 #include "parser.hpp"
 #define STRING_TOKEN yylval.string = new std::string(yytext,yyleng);
 #define CHAR_TOKEN yylval.character = yytext[0];
 #define TOKEN(t) ( yylval.token = t)
 extern "C" int yywrap() { }
-#line 475 "tokens.cpp"
+#line 476 "tokens.cpp"
 
 #define INITIAL 0
 
@@ -653,9 +654,9 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
     
-#line 11 "tokens.l"
+#line 12 "tokens.l"
 
-#line 659 "tokens.cpp"
+#line 660 "tokens.cpp"
 
 	if ( !(yy_init) )
 		{
@@ -741,85 +742,85 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 12 "tokens.l"
+#line 13 "tokens.l"
 ;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 13 "tokens.l"
+#line 14 "tokens.l"
 STRING_TOKEN; return ABS;
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 14 "tokens.l"
+#line 15 "tokens.l"
 STRING_TOKEN; return MAX;
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 15 "tokens.l"
+#line 16 "tokens.l"
 STRING_TOKEN; return MIN;
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 16 "tokens.l"
+#line 17 "tokens.l"
 STRING_TOKEN; return FSPARAM;
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 17 "tokens.l"
+#line 18 "tokens.l"
 STRING_TOKEN; return DOUBLE;
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 18 "tokens.l"
+#line 19 "tokens.l"
 STRING_TOKEN; return INTEGER;
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 19 "tokens.l"
+#line 20 "tokens.l"
 return TOKEN(LPAREN);
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 20 "tokens.l"
+#line 21 "tokens.l"
 return TOKEN(RPAREN);
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 21 "tokens.l"
+#line 22 "tokens.l"
 CHAR_TOKEN(PLUS); return PLUS;
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 22 "tokens.l"
+#line 23 "tokens.l"
 CHAR_TOKEN(MINUS); return MINUS;
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 23 "tokens.l"
+#line 24 "tokens.l"
 CHAR_TOKEN(MUL); return MUL;
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 24 "tokens.l"
+#line 25 "tokens.l"
 CHAR_TOKEN(DIV); return DIV;
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 25 "tokens.l"
+#line 26 "tokens.l"
 return TOKEN(COMMA);
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 26 "tokens.l"
+#line 27 "tokens.l"
 printf("Unknown token!\n"); yyterminate();
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 28 "tokens.l"
+#line 29 "tokens.l"
 ECHO;
 	YY_BREAK
-#line 823 "tokens.cpp"
+#line 824 "tokens.cpp"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -1817,7 +1818,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 28 "tokens.l"
+#line 29 "tokens.l"
 
 
 /* A Bison parser, made by GNU Bison 2.7.12-4996.  */

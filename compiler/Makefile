@@ -3,7 +3,7 @@ LEX_DEBUG=#--verbose --debug
 all: parser
 
 clean:
-	rm -f parser.cpp pparser tokens.cpp *.o *.hpp
+	rm -f parser.cpp parser parser.exe *.output tokens.cpp *.o *.hpp *.stackdump
 
 parser.cpp: parser.y
 	bison $(YACC_DEBUG) -d -o $@ $^

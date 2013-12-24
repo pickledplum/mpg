@@ -152,8 +152,6 @@ download_fs_tseries <- function(config_file){
     write.csv(comp.info, info_file)
     print(paste("Company basic info (id, name, domicile country) are written in: ", info_file))
     
-    return(0)
-    
     ########################
     # Time series
     ########################
@@ -219,7 +217,7 @@ download_fs_tseries <- function(config_file){
     print("Good bye...")
 }
 
-download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-cap-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/frontier/download_fs_tseries-cap-usd.conf")
 download_fs_tseries("D:/home/honda/mpg/developed/download_fs_tseries-cap-usd.conf")
-download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-cap-usd.conf")
-download_fs_tseries("D:/home/honda/mpg/acwi/download_fs_tseries-cap-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/emerging/download_fs_tseries-cap-usd.conf")
+#download_fs_tseries("D:/home/honda/mpg/acwi/download_fs_tseries-cap-usd.conf")

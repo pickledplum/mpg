@@ -4,7 +4,7 @@ conn <- dbConnect( SQLite(), db)
 
 table_list <- dbGetQuery(conn, "SELECT name FROM sqlite_master WHERE type='table'")
 table_list <- table_list[[1]]
-l <- grep("-USD$", table_list, value=TRUE)
+l <- grep("-local$", table_list, value=TRUE)
 for( tablename in l ){
     q_str <- paste("DROP TABLE if exists '", tablename, "'", sep="")
     print(q_str)
