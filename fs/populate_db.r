@@ -12,25 +12,27 @@ library(RSQLite)
 FILL_COUNTRY <- FALSE
 FILL_COMPANY <- FALSE
 FILL_DATA <- TRUE
+INIT_TABLE <- FALSE
 
-db <- "D:/home/honda/sqlite-db/security.sqlite3"
+db <- "D:/home/honda/sqlite-db/historical.sqlite3"
 
 # Populate company data table
 company_file_list <- c("D:/home/honda/mpg/acwi/fs_output/etf-acwi-company-info.txt",
-                       "D:/home/honda/mpg/developed/fs_output/ex-dm-company-info.txt",
+                       "D:/home/honda/mpg/frontier/fs_output/ex-fm-company-info.txt",
                        "D:/home/honda/mpg/emerging/fs_output/ex-em-company-info.txt",
-                       "D:/home/honda/mpg/frontier/fs_output/ex-fm-company-info.txt")
-
+                       "D:/home/honda/mpg/developed/fs_output/ex-dm-company-info.txt" 
+                       )
 data_dir_list <- c("D:/home/honda/mpg/acwi/fs_output",
-                       "D:/home/honda/mpg/developed/fs_output",
-                       "D:/home/honda/mpg/emerging/fs_output",
-                       "D:/home/honda/mpg/frontier/fs_output")
+                   "D:/home/honda/mpg/frontier/fs_output",
+                   "D:/home/honda/mpg/emerging/fs_output",
+                   "D:/home/honda/mpg/developed/fs_output"
+                   )
 
 data_prefix_list <- c("etf-acwi-",
                       "ex-fm-",
                       "ex-em-",
                       "ex-dm-")
-
+#
 if( FILL_COUNTRY ) {
     conn <- dbConnect( SQLite(), db)
     for( company_filename in company_file_list ){
@@ -140,14 +142,26 @@ if( FILL_DATA ){
     ls(hash)
     
     conn <- dbConnect( SQLite(), db)
-    for( data_dir in data_dir_list[1:1] ){
+    table_list <- dbGetQuery(conn, "SELECT name FROM sqlite_master WHERE type='table'")
+    table_list <- table_list[[1]]
+    existing_table_list <- c(character())
+    for( data_dir in data_dir_list[2] ){
         prefix <- hash[[data_dir]]
         regx <- paste("^",prefix,sep="")
         filename_list <- list.files(data_dir, full.names=FALSE, pattern=regx)
+        errorlog <- file(file.path(data_dir, "error.log"), "w", blocking=FALSE)
+
+        #filename_list <- c("ex-fm-FF_ASSETS_CURR-M-USD.csv",
+        #                   "ex-fm-P_TOTAL_RETURNC-D-local.csv", 
+        #                   "ex-fm-P_TOTAL_RETURNC-D-USD.csv"
+        #                   )
         for( filename in filename_list ){
             if( length(grep(".csv$", filename )) < 1 ) {
                 next
             }
+            writeLines(paste("<", filename, ">", sep=""), errorlog)
+            
+            print(paste("filename:", filename))
             meat <- sub(regx, "", filename)
             meat <- sub(".csv$", "", meat)
             tokens <- unlist(strsplit(meat, "-"))
@@ -157,28 +171,113 @@ if( FILL_DATA ){
             stem_tablename <- paste(param,freq,sep="-")
             
             fin <- file(file.path(data_dir, filename), "r", blocking=FALSE)
-            header <- read.table(fin, sep=",", as.is=FALSE, nrows=1, quote="", colClasses="character", strip.white=TRUE)
-            company_id_list <- unlist(header[2:length(header)])
-            close(fin)
-            # Remove leading X from all-numeric company ID.
-            # The "X" has been attached by R when collecting data from FS database
-            for( company_id in company_id_list[1:1]) {
-                company_id <- sub("^\"", "", company_id)   
-                company_id <- sub("\"$", "", company_id)
-                #print(company_id)
-                if( length(grep("^X[0-9]", company_id)) > 0 ){
-                    print(paste("----- Gotcha!", company_id))
-                    company_id <- sub("^X", "", company_id)
+            line <- readLines(fin,n=1)
+            header <- unlist(strsplit(line, ","))
+            tokens <- strsplit(header, ",")
+            if( length(tokens[1]) < 1 ) {
+                
+                print(paste("Bad file:", filename))
+                writeLines(paste("BAD FILE:", filename), errorlog )
+                nrows <- as.integer(tokens[2])
+                company_id_list <- unlist(header[3:length(header)])
+            } else{
+                nrows <- as.integer(tokens[1])
+                company_id_list <- unlist(header[2:length(header)])
+            }
+            ncols <- length(company_id_list)
+
+            nrows <- 20
+            block_size <- 500
+            for( start in seq(1, nrows, block_size)) {
+                end <- min(start + block_size - 1, nrows)
+                actual_size <- end-start+1
+                m <- matrix(nrow=actual_size, ncol=ncols)
+                dates <- matrix(nrow=actual_size, ncol=1)
+                for( i in seq(1:actual_size)){
+                    line <- readLines(fin, n=1)
+                    tokens <- unlist(strsplit(line, ","))
+                    date <- tokens[1]
+                    
+                    if( length(grep("/", date)) > 0) {
+                        d <- as.character(as.Date(date, format="%m/%d/%Y"))
+                    } else{
+                        d <- as.character(as.Date(date))
+                    }   
+                    dates[i,1] <- d
+                    
+                    m[i,] <- tokens[2:length(tokens)]
                 }
 
-                tablename <- paste(company_id, stem_tablename, sep="-")
-                # create <COMPANY_ID>-<PARAM>-<FREQ> table if not exists
-                q_str <- paste("CREATE TABLE IF NOT EXISTS '", tablename, "'(date DATE PRIMARY_KEY NOT NULL UNIQUE, usd REAL, local REAL)", sep="")
-                print(q_str)
-                tryCatch(dbSendQuery(conn, q_str), error=function(e){print(e)})
+                rownames(m) <- dates[,1]
+                colnames(m) <- company_id_list
+    
+                for( company_id in company_id_list[1:3]) {
+                    is_first <- TRUE
+
+                    for( date in rownames(m) ){
+                        val <- m[date,company_id]
+                        if( val == "NA" && is_first ){
+                            next
+                        }
+                        
+                        if( is_first ){
+                            is_first <- FALSE
+                            tablename <- paste(company_id, stem_tablename, sep="-")
+                            q_str <- paste("CREATE TABLE IF NOT EXISTS '", tablename, "'(date DATE PRIMARY_KEY NOT NULL UNIQUE, USD REAL, local REAL)", sep="")
+                            print(q_str)
+                            tryCatch(dbSendQuery(conn, q_str), 
+                                     error=function(e){
+                                         print(e)
+                                         writeLines(q_str, errorlog)
+                                     }
+                            )
+                        } 
+                        if( val != "NA" ){
+                            q_str <- paste("SELECT * FROM '", tablename, "' WHERE Date='", date, "'", sep="")
+                            print(q_str)
+                            result <- data.frame()
+                            tryCatch({result <- dbGetQuery(conn, q_str)},
+                                     error=function(e){
+                                         print(e)
+                                         writeLines(q_str, errorlog)
+                                     }
+                            )
+                            
+                            if( nrow(result) > 0 ){
+                                usd_val <- result$USD
+                                local_val <- result$local
+                                if( curr == "USD" ){
+                                    usd_val <- as.numeric(val)
+                                } else{
+                                    local_val <- as.numeric(val)
+                                }
+                            } else{  
+                                usd_val <- "NULL"
+                                local_val <- "NULL"
+                                if( curr == "USD" ){
+                                    usd_val <- as.numeric(val)
+                                } else{
+                                    local_val <- as.numeric(val)
+                                }
+                            }
+                            q_str <- paste("INSERT OR REPLACE INTO '", tablename, "' (Date, USD, local) VALUES ",
+                                               paste("(date('", date, "'), ", usd_val, ",", local_val, ")",sep=""), sep="")
+                            print(q_str)
+                            tryCatch(dbSendQuery(conn,q_str), 
+                                     error=function(e){
+                                         print(e)
+                                         writeLines(q_str, errorlog)
+                                     }
+                            )
+                        }
+                    }
+                    dbCommit(conn)
+                }
             }
-            dbCommit(conn)
+            close(fin)
         }
+
+        close(errorlog)
     }
     dbDisconnect(conn)
 }

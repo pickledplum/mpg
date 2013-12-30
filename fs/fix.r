@@ -1,17 +1,18 @@
 # Remove leading "x"
 
-source_dir <- "Z:/Backups/MPG-Production/fs-outputs/acwi"
-target_dir <- "D:/home/honda/mpg/acwi/fs_output"
 source_dir_list <- c("Z:/Backups/MPG-Production/fs-outputs/acwi",
                    "Z:/Backups/MPG-Production/fs-outputs/fm",
                    "Z:/Backups/MPG-Production/fs-outputs/em",
                    "Z:/Backups/MPG-Production/fs-outputs/dm")
 
+source_dir_list <- c("D:/home/honda/mpg/acwi/fs_output",
+                     "D:/home/honda/mpg/frontier/fs_output",
+                     "D:/home/honda/mpg/emerging/fs_output",
+                     "D:/home/honda/mpg/developed/fs_output")
 target_dir_list <- c("D:/home/honda/mpg/acwi/fs_output",
                      "D:/home/honda/mpg/frontier/fs_output",
                      "D:/home/honda/mpg/emerging/fs_output",
-                     "D:/home/honda/mpg/developed/fs_output"
-)
+                     "D:/home/honda/mpg/developed/fs_output")
 
 hash <- new.env(hash=TRUE)
 for( i in 1:length(source_dir_list)){
