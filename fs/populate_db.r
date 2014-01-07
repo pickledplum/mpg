@@ -12,7 +12,7 @@ library(RSQLite)
 FILL_COUNTRY <- FALSE
 FILL_COMPANY <- FALSE
 FILL_DATA <- TRUE
-INIT_TABLE <- FALSE
+WHICH_FREQ <- "M"
 
 db <- "D:/home/honda/sqlite-db/historical.sqlite3"
 
@@ -167,6 +167,9 @@ if( FILL_DATA ){
             tokens <- unlist(strsplit(meat, "-"))
             param <- tokens[1]
             freq <- tokens[2]
+            if( freq != WHICH_FREQ ){
+                next
+            }
             curr <- tokens[3]
             stem_tablename <- paste(param,freq,sep="-")
             
@@ -186,7 +189,6 @@ if( FILL_DATA ){
             }
             ncols <- length(company_id_list)
 
-            nrows <- 20
             block_size <- 500
             for( start in seq(1, nrows, block_size)) {
                 end <- min(start + block_size - 1, nrows)
@@ -211,9 +213,13 @@ if( FILL_DATA ){
                 rownames(m) <- dates[,1]
                 colnames(m) <- company_id_list
     
-                for( company_id in company_id_list[1:3]) {
+                for( company_id in company_id_list) {
+                    tablename <- paste(company_id, stem_tablename, sep="-")
+                    #if( tablename != 'B3C9VK-FF_EBIT_OPER-M'){
+                    #    next
+                    #}
                     is_first <- TRUE
-
+                    values <- ""
                     for( date in rownames(m) ){
                         val <- m[date,company_id]
                         if( val == "NA" && is_first ){
@@ -222,7 +228,6 @@ if( FILL_DATA ){
                         
                         if( is_first ){
                             is_first <- FALSE
-                            tablename <- paste(company_id, stem_tablename, sep="-")
                             q_str <- paste("CREATE TABLE IF NOT EXISTS '", tablename, "'(date DATE PRIMARY_KEY NOT NULL UNIQUE, USD REAL, local REAL)", sep="")
                             print(q_str)
                             tryCatch(dbSendQuery(conn, q_str), 
@@ -232,49 +237,84 @@ if( FILL_DATA ){
                                      }
                             )
                         } 
-                        if( val != "NA" ){
-                            q_str <- paste("SELECT * FROM '", tablename, "' WHERE Date='", date, "'", sep="")
-                            print(q_str)
-                            result <- data.frame()
-                            tryCatch({result <- dbGetQuery(conn, q_str)},
-                                     error=function(e){
-                                         print(e)
-                                         writeLines(q_str, errorlog)
-                                     }
-                            )
+                        
+                        if( WHICH_FREQ == "D" ){
+                            if( val != "NA" ){
                             
-                            if( nrow(result) > 0 ){
-                                usd_val <- result$USD
-                                local_val <- result$local
-                                if( curr == "USD" ){
-                                    usd_val <- as.numeric(val)
-                                } else{
-                                    local_val <- as.numeric(val)
+                                q_str <- paste("SELECT * FROM '", tablename, "' WHERE Date='", date, "'", sep="")
+                                print(q_str)
+                                result <- data.frame()
+                                tryCatch({result <- dbGetQuery(conn, q_str)},
+                                         error=function(e){
+                                             print(e)
+                                             writeLines(q_str, errorlog)
+                                         }
+                                )
+                                if( nrow(result) > 0 ){
+                                    usd_val <- ifelse(!is.na(result$USD), result$USD, "NULL")
+    
+                                    local_val <- ifelse(!is.na(result$local), result$local, "NULL")
+                                } else{  
+                                    usd_val <- "NULL"
+                                    local_val <- "NULL"
                                 }
-                            } else{  
-                                usd_val <- "NULL"
-                                local_val <- "NULL"
                                 if( curr == "USD" ){
-                                    usd_val <- as.numeric(val)
+                                    usd_val <- ifelse(!is.na(val), as.numeric(val), "NULL")
                                 } else{
-                                    local_val <- as.numeric(val)
+                                    local_val <- ifelse(!is.na(val), as.numeric(val), "NULL")
                                 }
-                            }
-                            q_str <- paste("INSERT OR REPLACE INTO '", tablename, "' (Date, USD, local) VALUES ",
+                                q_str <- paste("INSERT OR REPLACE INTO '", tablename, "' (Date, USD, local) VALUES ",
                                                paste("(date('", date, "'), ", usd_val, ",", local_val, ")",sep=""), sep="")
-                            print(q_str)
-                            tryCatch(dbSendQuery(conn,q_str), 
-                                     error=function(e){
-                                         print(e)
-                                         writeLines(q_str, errorlog)
-                                     }
-                            )
+                                
+                                print(q_str)
+                                tryCatch(dbSendQuery(conn,q_str), 
+                                         error=function(e){
+                                             print(e)
+                                             writeLines(q_str, errorlog)
+                                         }
+                                )
+                            }
+                            
+                        } else { # "M"
+                            usd_val <- ifelse(val!="NA", as.numeric(val), "NULL")
+                            tuple <- paste("(date('", date, "'),", usd_val, ")", sep="")
+                            values <- ifelse(nchar(values)==0, tuple, paste(values, ",", tuple, sep=""))
                         }
+                    }
+                    if( WHICH_FREQ == "D" ){
+                        
+                    } else {
+                        if( nchar(values) < 1 ){
+                            next
+                        }
+                        q_str <- paste("INSERT OR REPLACE INTO '", tablename, "' (Date, USD) VALUES ",
+                                       values, sep="")       
+                        print(q_str)
+                        tryCatch(dbSendQuery(conn, q_str), 
+                                 error=function(e){
+                                     print(e)
+                                     writeLines(q_str, errorlog)
+                                 }
+                        )
                     }
                     dbCommit(conn)
                 }
+                close(fin)
+                all_vars = ls()
+                vars_to_remove = all_vars[-c(which(all_vars=="filename_list"),
+                                             which(all_vars=="errorlog"),
+                                             which(all_vars=="regx"),
+                                             which(all_vars=="prefix"),
+                                             which(all_vars=="data_dir"),
+                                             which(all_vars=="WHICH_FREQ"),
+                                             which(all_vars=="conn"),
+                                             which(all_vars=="hash"))]
+                rm(list=vars_to_remove)
+#                 remove(m)
+#                 remove(dates)
+#                 remove(company_id_list)
             }
-            close(fin)
+            
         }
 
         close(errorlog)
