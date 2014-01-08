@@ -22,35 +22,36 @@ read_config <- function( config_file ) {
         val_str <- gsub(" ", "", table[para,2])
         tokens <- strsplit(val_str, ",")
         if( length(tokens[[1]]) == 1 ){
-            tryCatch({
-                as.numeric(tokens[[1]][1])
-                assign(para, as.numeric(tokens[[1]]), envir=env)
-            }, warning = function(w){
-                assign(para, tokens[[1]][1], envir=env)
-            })
+            #tryCatch({
+            #    as.numeric(tokens[[1]][1])
+            #    assign(para, as.numeric(tokens[[1]]), envir=env)
+            #}, warning = function(w){
+            #    assign(para, tokens[[1]][1], envir=env)
+            #})
+            assign(para, tokens[[1]][1], envir=env)
         }
         else{
-            #browser()
-            l <- vector("list", length(tokens[[1]]))
-            i=1
-            for( token in tokens[[1]] ){
-                l[i] = token
-                tryCatch({
-                    as.numeric(token)
-                    l[i] = as.numeric(token)
-                }, warning = function(w){
-                    #ignore
-                })
-                
-                #print(l[i])
-                i = i+1
-            }
-            assign(para, unlist(l), envir=env)
+            
+            #l <- vector("list", length(tokens[[1]]))
+            #i=1
+            #for( token in tokens[[1]] ){
+            #    l[i] = token
+            #    tryCatch({
+            #        as.numeric(token)
+            #        l[i] = as.numeric(token)
+            #    }, warning = function(w){
+            #        #ignore
+            #    })
+            #    
+            #    #print(l[i])
+            #    i = i+1
+            #}
+            assign(para, unlist(tokens[[1]]), envir=env)
         }
     }
     return(env)
 }
 
-e <- read_config("/home/honda/mpg/dummy/params.conf")
-#get("FF_ASSETS", e)
-#exists("FF_ASSETS", e)
+config <- read_config("/home/honda/mpg/dummy/params.conf")
+#get("FF_ASSETS", config)
+#exists(config)
