@@ -184,13 +184,10 @@ download <- function(config_file) {
                 })
                 close(fout)
             }
-
         }
-
     }
     ended <- proc.time()
-    
-    
+    print(paste("Ellapsed time:", (ended-started)[3]))
     return(0)
 }
 config_file <- "/home/honda/mpg/dummy/params.conf"
