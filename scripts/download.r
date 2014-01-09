@@ -91,14 +91,13 @@ download <- function(config_file) {
     ########################################
     # Compnay info
     ########################################
-    #comp.info <- FF.ExtractDataSnapshot(universe, 
-    #                                    "FG_COMPANY_NAME,P_DCOUNTRY,P_REGION,P_EXCHANGE,P_CURRENCY,P_CURRENCY_CODE")
-    #info_file <- file.path(output_dir, paste(prefix, "company-info.txt",sep="-"))
-    #write.table(comp.info, info_file, row.names=FALSE, sep=",", quote=TRUE)
-    #print(paste("Company basic info are written in: ", info_file))
+    comp.info <- FF.ExtractDataSnapshot(universe, 
+                                        "FG_COMPANY_NAME,P_DCOUNTRY,P_REGION,P_EXCHANGE,P_CURRENCY,P_CURRENCY_CODE")
+    info_file <- file.path(output_dir, paste(prefix, "company-info.txt",sep="-"))
+    write.table(comp.info, info_file, row.names=FALSE, sep=",", quote=TRUE)
+    print(paste("Company basic info are written in: ", info_file))
     
-    
-    
+
     ########################################
     # Download
     ########################################
@@ -133,33 +132,14 @@ download <- function(config_file) {
         }
 
         for( freq in freq_list ){
-            for( curr in curr_list ){
-                for( isin in universe ) {
-                    #browser() 
-                    data
-                    master_data = NULL
-                    output_filename <- file.path(output_dir, 
-                                                 paste(
-                                                     paste(prefix, param, isin, sep="-"),
-                                                     ".csv", sep=""))
-                    print(output_filename)
-                    if( file.exists(output_filename) ){
-                        tryCatch({
-                                fin <- file(output_filename, "r", blocking=FALSE)
-                                master_data = read.table(fin, 
-                                                     sep=",", 
-                                                     header=TRUE, 
-                                                     as.is=TRUE, 
-                                                     quote="")
-                            }, error =function(msg){
-                                 master_data = NULL
-                            }, finally = function(fin){
-                                close(fin)
-                            }
-                        )
-                        close(fin)
-                    } 
-                    
+            for( isin in universe ) {
+                output_filename <- file.path(output_dir, 
+                                             paste(
+                                                 paste(prefix, param, isin, sep="-"),
+                                                 ".csv", sep=""))
+                print(output_filename)
+                master_data = NULL
+                for( curr in curr_list ){
                     tryCatch({
                         data <- FF.ExtractFormulaHistory(isin,param,paste(t0,":",t1, ":",freq), paste("curr=",curr,sep=""))
                     }, error=function(msg){
@@ -172,14 +152,9 @@ download <- function(config_file) {
                     }
                     non_nan <- !is.na(data[3])
                     tseries <- as.data.frame(cbind(data[2][non_nan], data[3][non_nan]))
-                    #browser()
-                    colnames(tseries) <- c(paste("n",nrow(tseries),sep=""), curr)
-                    print("tseries-2---------------------")
-                    print(colnames(tseries))
+                    colnames(tseries) <- c(paste("nr",nrow(tseries),sep=""), curr)
                     
                     if( !is.null(master_data) ){
-                        print("master-----------------------")
-                        print(colnames(master_data))
                         
                         tseries <- merge(x=master_data, 
                                          y=tseries, 
@@ -187,29 +162,29 @@ download <- function(config_file) {
                                          by.y=colnames(master_data)[1],
                                          all=TRUE)
                     }
-                    #print("after merging or not-------------")
-                    #print(tseries)
-                   
-                    tryCatch({
-                        fout <- file(output_filename, "w", blocking=FALSE)
-                        write.table(tseries, fout,
-                                    quote=FALSE, 
-                                    row.names=FALSE, 
-                                    col.names=TRUE,
-                                    sep=",")
-                        
-                        
-                        }, error=function(msg){
-                            print(paste("ERROR!!!", msg))
-                            return(NULL)
-                        }, finally=function(fout){
-                            close(fout)
-                        })
-                    close(fout)
+                    else{
+                        master_data <- tseries
+                    }
                 }
+                
+                tryCatch({
+                    fout <- file(output_filename, "w", blocking=FALSE)
+                    write.table(master_data, fout,
+                                quote=FALSE, 
+                                row.names=FALSE, 
+                                col.names=TRUE,
+                                sep=",")
+                    
+                    
+                }, error=function(msg){
+                    print(paste("ERROR!!!", msg))
+                    return(NULL)
+                }, finally=function(fout){
+                    close(fout)
+                })
+                close(fout)
             }
-            
-            
+
         }
 
     }
