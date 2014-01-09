@@ -155,7 +155,6 @@ download <- function(config_file) {
                     colnames(tseries) <- c(paste("nr",nrow(tseries),sep=""), curr)
                     
                     if( !is.null(master_data) ){
-                        
                         tseries <- merge(x=master_data, 
                                          y=tseries, 
                                          by.x=colnames(tseries)[1],
@@ -169,6 +168,8 @@ download <- function(config_file) {
                 
                 tryCatch({
                     fout <- file(output_filename, "w", blocking=FALSE)
+                    colnames(master_data) <- c(paste("nr",nrow(master_data),sep=""),
+                                               colnames(master_data)[2:ncol(master_data)])
                     write.table(master_data, fout,
                                 quote=FALSE, 
                                 row.names=FALSE, 
