@@ -32,8 +32,9 @@ download <- function(config_file) {
     } else if( exists("UNIVERSE", envir=config) ){
         universe_file <- get("UNIVERSE", mode="character", envir=config) # "list_of_constituents.txt"
         print(paste("Opening:", universe_file))
+        stopifnot( file.exists(universe_file))
         conn <- file(universe_file, open="r", blocking=FALSE)
-        temp <- read.table(conn, strip.white=TRUE, blank.lines.skip=TRUE, comment.char="#")
+        temp <- read.table(conn, header=TRUE, strip.white=TRUE, blank.lines.skip=TRUE, comment.char="#")
         universe <-temp[[1]]
         close(conn)
         
@@ -86,9 +87,9 @@ download <- function(config_file) {
     fs_prefix <- get("FACTSET_PREFIX", envir=config)
     fs_prefix_pattern <- paste("^", fs_prefix, sep="")
     config_param_list <- grep(fs_prefix_pattern, ls(config), value=TRUE)
-    config_param_list <- config_param_list[-c(which(config_param_list=="FACTSET_PREFIX"))]
+    config_param_list <- config_param_list[-c(which(config_param_list=="FACTSET_PREFIX"))]   
+    param_list <- gsub(fs_prefix_pattern, "", config_param_list)
     
-
     ########################################
     # Compnay info
     ########################################
@@ -104,16 +105,14 @@ download <- function(config_file) {
     ########################################
 
     started <- proc.time()
-    for( config_param in config_param_list ){
-        param <- gsub(fs_prefix_pattern, "", config_param)[1]
-        print(paste("!!!!!!!!!!param!!!!!!!!!! - ", param))
+    for( param in param_list ){
         # create a subdirectory for this param
         output_dir <- file.path(output_root, param)
         if( !file.exists(output_dir) ){
             dir.create(output_dir, showWarnings=TRUE, recursive=FALSE, mode="0775")
         }
         
-        controls <- get(config_param, envir=config)
+        controls <- get(paste(fs_prefix, param, sep=""), envir=config)
         curr_list <- c(default_currency)
         freq_list <- c()
         if( all("LOCAL" %in% controls) ) {
