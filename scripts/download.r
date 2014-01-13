@@ -16,7 +16,7 @@ download <- function(config_file) {
     ########################################
     config <- read_config(config_file) # returns an environment
     
-    output_dir <- ""
+    output_root <- ""
     portfolio_ofdb <- ""
     universe <- c()
     prefix <- ""
@@ -24,8 +24,8 @@ download <- function(config_file) {
     t1 <- ""
     default_currency <- ""
     
-    stopifnot( exists("OUTPUT_DIR", envir=config) )
-    output_dir <- get("OUTPUT_DIR", mode="character", envir=config) # "D:/home/honda/mpg/dummy/fs_output"
+    stopifnot( exists("OUTPUT_ROOT", envir=config) )
+    output_root <- get("OUTPUT_ROOT", mode="character", envir=config) # "D:/home/honda/mpg/dummy/fs_output"
     
     if( exists("PORTFOLIO_OFDB", envir=config) ){
         portfolio_ofdb <- get("PORTFOLIO_OFDB", mode="character", envir=config) # "PERSONAL:HONDA_MSCI_ACWI_ETF"
@@ -54,8 +54,8 @@ download <- function(config_file) {
     stopifnot( exists("DEFAULT_CURRENCY", envir=config) )
     default_currency <- get("DEFAULT_CURRENCY", mode="character", envir=config) # USD
     
-    stopifnot( file.exists(output_dir) )
-    print(paste("OUTPUT_DIR:", output_dir))
+    stopifnot( file.exists(output_root) )
+    print(paste("output_root:", output_root))
     if( length(universe)== 0 && portfolio_ofdb != "" ){
         # Load the universe from FS portfolio
         data <- FF.ExtractOFDBUniverse(portfolio_ofdb, "0O")
@@ -86,6 +86,7 @@ download <- function(config_file) {
     fs_prefix <- get("FACTSET_PREFIX", envir=config)
     fs_prefix_pattern <- paste("^", fs_prefix, sep="")
     config_param_list <- grep(fs_prefix_pattern, ls(config), value=TRUE)
+    config_param_list <- config_param_list[-c(which(config_param_list=="FACTSET_PREFIX"))]
     
 
     ########################################
@@ -93,7 +94,7 @@ download <- function(config_file) {
     ########################################
     comp.info <- FF.ExtractDataSnapshot(universe, 
                                         "FG_COMPANY_NAME,P_DCOUNTRY,P_REGION,P_EXCHANGE,P_CURRENCY,P_CURRENCY_CODE")
-    info_file <- file.path(output_dir, paste(prefix, "company-info.txt",sep="-"))
+    info_file <- file.path(output_root, paste(prefix, "company-info.txt",sep="-"))
     write.table(comp.info, info_file, row.names=FALSE, sep=",", quote=TRUE)
     print(paste("Company basic info are written in: ", info_file))
     
@@ -105,6 +106,13 @@ download <- function(config_file) {
     started <- proc.time()
     for( config_param in config_param_list ){
         param <- gsub(fs_prefix_pattern, "", config_param)[1]
+        print(paste("!!!!!!!!!!param!!!!!!!!!! - ", param))
+        # create a subdirectory for this param
+        output_dir <- file.path(output_root, param)
+        if( !file.exists(output_dir) ){
+            dir.create(output_dir, showWarnings=TRUE, recursive=FALSE, mode="0775")
+        }
+        
         controls <- get(config_param, envir=config)
         curr_list <- c(default_currency)
         freq_list <- c()
@@ -135,7 +143,7 @@ download <- function(config_file) {
             for( isin in universe ) {
                 output_filename <- file.path(output_dir, 
                                              paste(
-                                                 paste(prefix, param, isin, sep="-"),
+                                                 paste(param, isin, sep="-"),
                                                  ".csv", sep=""))
                 print(output_filename)
                 master_data = NULL
