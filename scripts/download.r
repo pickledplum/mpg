@@ -2,7 +2,8 @@
 library(tools)
 library(FactSetOnDemand)
 library(xts)
-source("/home/honda/mpg/scripts/read_config.r")
+#source("read_config.r")
+#source('logger.r"')
 
 download <- function(config_file) {
     ########################################
@@ -33,10 +34,10 @@ download <- function(config_file) {
         universe_file <- get("UNIVERSE", mode="character", envir=config) # "list_of_constituents.txt"
         print(paste("Opening:", universe_file))
         stopifnot( file.exists(universe_file))
-        conn <- file(universe_file, open="r", blocking=FALSE)
-        temp <- read.table(conn, header=TRUE, strip.white=TRUE, blank.lines.skip=TRUE, comment.char="#")
+        unicon <- file(universe_file, open="r", blocking=FALSE)
+        temp <- read.table(unicon, header=TRUE, strip.white=TRUE, blank.lines.skip=TRUE, comment.char="#")
         universe <-temp[[1]]
-        close(conn)
+        close(unicon)
         
     } else{
         #error
@@ -144,9 +145,11 @@ download <- function(config_file) {
                                              paste(
                                                  paste(param, isin, sep="-"),
                                                  ".csv", sep=""))
-                print(output_filename)
+                log.info(output_filename)
                 master_data = NULL
+                #browser()
                 for( curr in curr_list ){
+                    
                     tryCatch({
                         data <- FF.ExtractFormulaHistory(isin,param,paste(t0,":",t1, ":",freq), paste("curr=",curr,sep=""))
                     }, error=function(msg){
@@ -162,7 +165,7 @@ download <- function(config_file) {
                     colnames(tseries) <- c(paste("nr",nrow(tseries),sep=""), curr)
                     
                     if( !is.null(master_data) ){
-                        tseries <- merge(x=master_data, 
+                        master_data <- merge(x=master_data, 
                                          y=tseries, 
                                          by.x=colnames(tseries)[1],
                                          by.y=colnames(master_data)[1],
@@ -198,5 +201,3 @@ download <- function(config_file) {
     print(paste("Ellapsed time:", (ended-started)[3]))
     return(0)
 }
-config_file <- "/home/honda/mpg/dummy/params.conf"
-download(config_file)

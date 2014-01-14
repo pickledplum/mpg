@@ -4,15 +4,14 @@ library(tools)
 library(xts)
 library(RSQLite)
 
-source("/home/honda/mpg/scripts/read_config.r")
-db <<- "D:/home/honda/sqlite-db/financial.sqlite3"
+#source("read_config.r")
+#source("logger.r")
 
 # Max number of db write access trials before bailing out
 MAX_TRIALS <<- 5
 
-populate_db <- function(config_file) {
-    
-    on.exit(exit_f)
+populate_data <- function(config_file, conn) {
+
     ########################################
     # Load config
     ########################################
@@ -81,17 +80,14 @@ populate_db <- function(config_file) {
     param_list <- gsub(fs_prefix_pattern, "", config_param_list)
     
     print(paste(param_list, collapse=","))
-    
-    timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
-    logger <<- file.path(source_root, paste(timestamp, ".log",sep=""))
-    print(paste("Log file:", logger))
-    populate_data(universe, param_list, source_root)
+    populate_tables(universe, param_list, source_root)
 
+    log.info("Completed normally...")
+    print("Completed normally...")
 }
-populate_data <- function(universe, param_list, source_root)
+populate_tables <- function(universe, param_list, source_root)
 {
-    dbconn <<- dbConnect( SQLite(), db )
-    table_list <- dbGetQuery(dbconn, "SELECT name FROM sqlite_master WHERE type='table'")
+    table_list <- dbGetQuery(conn, "SELECT name FROM sqlite_master WHERE type='table'")
     table_list <- list(table_list[[1]])
     names(table_list) <- table_list
     table_hash <- new.env(hash=TRUE)
@@ -116,7 +112,7 @@ populate_data <- function(universe, param_list, source_root)
                 q_str <- paste("CREATE TABLE IF NOT EXISTS '", tablename, "'(julian INTEGER PRIMARY_KEY NOT NULL UNIQUE, USD REAL, local REAL)", sep="")
                 
                 tryCatch({
-                    dbSendQuery(dbconn, q_str)
+                    dbSendQuery(conn, q_str)
                     log.info(paste("Created a table:", tablename))
                     },
                      error=function(e){
@@ -130,15 +126,13 @@ populate_data <- function(universe, param_list, source_root)
                                as.is=TRUE, header=TRUE, strip.white=TRUE,
                                colClasses=c("character"),
                                quote="")
-            
-            apply(data, 1, f, tablename)
+
+            populate_table(data, tablename)
             log.info(paste("Populated table:", tablename))
         }
     }
-    
-    
 }
-f <- function(x, tablename){
+tuple2str <- function(x, tablename){
 
     date <- NULL
 
@@ -147,8 +141,7 @@ f <- function(x, tablename){
         
     }, error=function(msg){
         #ignore
-        log.error(msg)
-        log.error(paste(tablename, paste(x, collapse=","), sep=":"))
+        log.error(paste(msg, ":", paste(x, collapse=",")))
         return(NULL)
     }
     )
@@ -171,64 +164,57 @@ f <- function(x, tablename){
             val <- "NULL"
         })
     })
+    s <- paste("(", paste(date, paste(vals, collapse=","), sep=","), ")", sep="")
+    return(s)
+}
+populate_table <- function(data, tablename){
+
+    if( nrow(data) < 1 ){
+        return(1)
+    }
+    tuple_list <- apply(data, 1, tuple2str, tablename)
+    chunk_size <- 50
+    for( begin in seq(1, length(tuple_list), chunk_size) ){
+        end <- min(begin+chunk_size,length(tuple_list)) - 1
+        
     
-    q_str <- paste("INSERT OR REPLACE INTO ", 
-                   "'", tablename, "'",
-                   " (", paste("julian", paste(names(vals), collapse=","), sep=","), ")",
-                   " VALUES ",
-                   " (", paste(date, paste(vals, sep=","), sep=","), ")",
-                   sep="")
-    
-    #log.info(q_str)
-    success <- FALSE
-    n_trials = 1
-    while(!success){
-        tryCatch({
-                    dbSendQuery(dbconn,q_str)
-                    success <- TRUE
-                },
-                 error=function(e){
-                     
-                     print(e)
-                     if( n_trials <= MAX_TRIALS ){
-                        n_trials = n_trials + 1
-                        msg <- paste("DB failure:", q_str, ", trying again...")
-                        log.warn(msg)
-                     } else{
-                         msg <- paste("DB failure:", q_str, ", bailing out..")
-                         log.error(msg)
-                         return(NULL)
+        tuple_list_str <- paste(tuple_list[begin:end], collapse=",")
+        
+        q_str <- paste("INSERT OR REPLACE INTO ", 
+                       "'", tablename, "'",
+                       " (", paste("julian", paste(names(data)[2:ncol(data)], collapse=","), sep=","), ")",
+                       " VALUES ",
+                       tuple_list_str,
+                       sep="")
+        
+        log.info(paste("INSERT OR REPLACE INTO ", 
+                       "'", tablename, "'",
+                       " (", paste("julian", paste(names(data)[2:ncol(data)], collapse=","), sep=","), ")",
+                       " VALUES ",
+                       " ...(", end-begin+1, " vals)",
+                       sep=""))
+        #log.info(q_str)
+        success <- FALSE
+        n_trials = 1
+        while(!success){
+            tryCatch({
+                        dbSendQuery(conn,q_str)
+                        success <- TRUE
+                    },
+                     error=function(e){
+                         #browser()
+                         print(e)
+                         if( n_trials <= MAX_TRIALS ){
+                            n_trials = n_trials + 1
+                            msg <- paste("DB failure:", q_str, ", trying again...")
+                            log.warn(msg)
+                         } else{
+                             msg <- paste("DB failure:", q_str, ", bailing out..")
+                             log.error(msg)
+                             return(NULL)
+                         }
                      }
-                 }
-        )
+            )
+        }
     }
 }  
-log.error <- function( msg){
-    t <- format(Sys.time(), "%H:%M:%S")
-    con <- file(logger, open="at", blocking=FALSE)
-    writeLines(paste(t, "ERROR", "-", msg), con)
-    flush(con)
-    close(con)
-
-}
-log.warn <- function( msg ){
-    t <- format(Sys.time(), "%H:%M:%S")
-    con <- file(logger, open="at", blocking=FALSE)
-    writeLines(paste(t, "WARN", "-", msg), con)
-    flush(con)
-    close(con)
-}
-log.info <- function( msg ){
-    t <- format(Sys.time(), "%H:%M:%S")
-    con <- file(logger, open="at", blocking=FALSE)
-    writeLines(paste(t, "INFO", "-", msg), con)
-    flush(con)
-    close(con)
-}
-
-exit_f <- function(){
-    dbDisconnect(dbconn)
-}
-
-config_file <- "/home/honda/mpg/dummy/params.conf"
-populate_db(config_file)
