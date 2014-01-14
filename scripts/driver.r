@@ -23,8 +23,8 @@ print(paste("Log file:", logger))
 conn <<- dbConnect( SQLite(), db )
 log.info(paste("Opened SQLite database:", db))
 
-download(config_file)
-log.info("Finished downloading data from FactSet servers...")
+#download(config_file)
+#log.info("Finished downloading data from FactSet servers...")
 
 # Populate company data table
 company_file_list <- c( "D:/home/honda/mpg/dummy/fs_output/dummy-company-info.txt",
@@ -34,14 +34,20 @@ company_file_list <- c( "D:/home/honda/mpg/dummy/fs_output/dummy-company-info.tx
                         "D:/home/honda/mpg/developed/fs_output/ex-dm-company-info.txt" 
 )
 market_designations <- c("dummy", "NULL", "fm", "em", "dm")
-drop_tables(conn, exclude=c())
-log.info("Finished dropping tables")
+groups <- c("dummy", "acwi", "fm", "em", "dm")
+meta_data_source <- data.frame(company_file_list, market_designations)
+colnames(meta_data_source) <- c("company_infofile", "market")
+rownames(meta_data_source) <- groups
+
+#drop_tables(conn, exclude=c())
+#log.info("Finished dropping tables")
+
+#populate_company(conn, meta_data_source)
+#log.info("Finished populating country, company tables...")
+
+#populate_data(config_file, conn)
+#log.info("Finished populating time series tables...")
 
 
-populate_company(conn, company_file_list, market_designations)
-log.info("Finished populating country, company tables...")
-
-populate_data(config_file, conn)
-log.info("Finished populating time series tables...")
-
+dbCommit(conn)
 dbDisconnect(conn)
