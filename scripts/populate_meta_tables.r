@@ -1,10 +1,11 @@
 # Populate company, country tables
 library(RSQLite)
 source("logger.r")
-FILL_COUNTRY <- TRUE
-FILL_COMPANY <- TRUE
 
-populate_meta_tables <- function(conn,meta_data_source ){
+populate_meta_tables <- function(conn, meta_data_source, 
+                                 do_create_country=TRUE,
+                                 do_create_company=TRUE,
+                                 do_create_index=TRUE ){
 
     company_file_list <- meta_data_source[[1]] 
     market_designations <- meta_data_source[[2]]
@@ -15,7 +16,7 @@ populate_meta_tables <- function(conn,meta_data_source ){
         y <- company_file_list[i]
         assign(x,y,envir=hash)
     }
-    if( FILL_COUNTRY ) {
+    if( do_create_country ) {
         q_str <- paste("CREATE TABLE IF NOT EXISTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country VARCHAR(15), region VARCHAR(20),exchange VARCHAR(25),currency VARCHAR(25),currency_iso VARCHAR(3),market VARCHAR(10))")
         dbSendQuery(conn, q_str)
         for( market_designation in market_designations ){
@@ -72,7 +73,7 @@ populate_meta_tables <- function(conn,meta_data_source ){
             }
         }
     }
-    if( FILL_COMPANY ){
+    if( do_create_company ){
         
         q_str <- paste("CREATE TABLE IF NOT EXISTS company (isin VARCHAR(15) PRIMARY KEY NOT NULL UNIQUE, company TEXT(100), country_id INTEGER, FOREIGN KEY(country_id) REFERENCES country(country_id))")
         dbSendQuery(conn, q_str)
@@ -115,10 +116,42 @@ populate_meta_tables <- function(conn,meta_data_source ){
                 value_list <- c(id, company)#, country_code)
                 value_str <- paste("\"", value_list, "\"",sep="", collapse=",")
                 value_str <- paste(value_str, country_code, sep=",")
-                q_str <- paste("INSERT INTO company(isin,company,country_id) VALUES(",value_str,")",sep="")
+                q_str <- paste("INSERT INTO company (isin,company,country_id) VALUES(",value_str,")",sep="")
                 print(q_str)
                 tryCatch(dbSendQuery(conn, q_str), error=function(e){print(e)})
             }
         }
     }
+    if( do_create_index ){
+        fin <- file("index_list.txt", "r", blocking=FALSE)
+        index_info <- read.csv(fin)
+        index_list <- index_info$index
+        index_descriptions <- index_info$descript
+        index_type <- index_info$type
+        q_str <- paste("CREATE TABLE IF NOT EXISTS financial_index (index_name VARCHAR(25) PRIMARY KEY NOT NULL UNIQUE, index_descrip TEXT(100), constituents_tablename VARCHAR(25))")
+        tryCatch(dbSendQuery(conn, q_str), error=function(e){print(e)})
+        
+
+        for( i in seq(1, length(index_list)) ){
+            
+            index_name <- index_list[i]
+            index_descrip <- index_descriptions[i]
+            constituents_tablename <- paste(tolower(index_name))
+            
+            q_str <- paste("INSERT OR REPLACE INTO financial_index (index_name, index_descrip, constituents_tablename) VALUES (",
+                           paste(paste("\"", index_name, "\"", sep=""),
+                                 paste("\"", index_descrip, "\"", sep=""), 
+                                 paste("\"", constituents_tablename, "\"", sep=""),
+                                 sep=","),
+                           
+                           ")", sep="")
+            print(q_str)
+            tryCatch(dbSendQuery(conn, q_str), 
+                     error=function(e){
+                         print(e)
+                        }
+            )
+        }
+    }
+    
 }

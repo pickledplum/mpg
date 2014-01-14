@@ -9,6 +9,15 @@ exit_f <- function(){
     dbDisconnect(conn)
 }
 
+DO_DOWNLOAD <- FALSE
+DO_DROP <- FALSE
+DO_CREATE_METATABLES <- TRUE
+    DO_CREATE_COUNTRY <- FALSE
+    DO_CREATE_COMPANY <- FALSE
+    DO_CREATE_INDEX <- TRUE
+
+DO_POPULATE_DATATABLES <- TRUE
+
 
 db <- "D:/home/honda/sqlite-db/financial.sqlite3"
 config_file <- "/home/honda/mpg/dummy/params.conf"
@@ -23,8 +32,10 @@ print(paste("Log file:", logger))
 conn <<- dbConnect( SQLite(), db )
 log.info(paste("Opened SQLite database:", db))
 
-download(config_file)
-log.info("Finished downloading data from FactSet servers...")
+if( DO_DOWNLOAD ){
+    download(config_file)
+    log.info("Finished downloading data from FactSet servers...")
+}
 
 # Populate company data table
 company_file_list <- c( "D:/home/honda/mpg/dummy/fs_output/dummy-company-info.txt",
@@ -40,14 +51,23 @@ meta_data_source <- data.frame(company_file_list[1],
 colnames(meta_data_source) <- c("company_infofile", "market")
 rownames(meta_data_source) <- groups[1]
 
-drop_tables(conn, exclude=c())
-log.info("Finished dropping tables")
+if( DO_DROP ){
+    drop_tables(conn, exclude=c())
+    log.info("Finished dropping tables")
 
-populate_meta_tables(conn, meta_data_source)
-log.info("Finished populating country, company tables...")
+}
+if( DO_CREATE_METATABLES ){
+    populate_meta_tables(conn, meta_data_source, 
+                         DO_CREATE_COUNTRY, 
+                         DO_CREATE_COMPANY, 
+                         DO_CREATE_INDEX)
+    log.info("Finished populating country, company tables...")
+}
 
-populate_data(config_file, conn)
-log.info("Finished populating time series tables...")
+if( DO_POPULATE_DATATABLES ){
+    populate_data(config_file, conn)
+    log.info("Finished populating time series tables...")
+}
 
 dbCommit(conn)
 dbDisconnect(conn)

@@ -1,0 +1,5 @@
+index, descript, type
+ACWI,"All Country World Index",index
+EM, "iShare ETF Emerging Market", etf
+DM, "iShare ETF Developed Market", etf
+FM, "iShare ETF Frontier Market", etf
