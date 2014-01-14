@@ -35,7 +35,7 @@ download <- function(config_file) {
         print(paste("Opening:", universe_file))
         stopifnot( file.exists(universe_file))
         unicon <- file(universe_file, open="r", blocking=FALSE)
-        temp <- read.table(unicon, header=TRUE, strip.white=TRUE, blank.lines.skip=TRUE, comment.char="#")
+        temp <- read.table(unicon, colClasses=c("character"), header=TRUE, strip.white=TRUE, blank.lines.skip=TRUE, comment.char="#")
         universe <-temp[[1]]
         close(unicon)
         
@@ -143,15 +143,29 @@ download <- function(config_file) {
             for( isin in universe ) {
                 output_filename <- file.path(output_dir, 
                                              paste(
-                                                 paste(param, isin, sep="-"),
+                                                 paste(param, as.character(isin), sep="-"),
                                                  ".csv", sep=""))
                 log.info(output_filename)
                 master_data = NULL
                 #browser()
                 for( curr in curr_list ){
-                    
                     tryCatch({
-                        data <- FF.ExtractFormulaHistory(isin,param,paste(t0,":",t1, ":",freq), paste("curr=",curr,sep=""))
+                        if( grepl("^P_", param) ){
+                            fs_str <- paste(param, "(", paste(t0,t1,freq,curr,sep=","),")",sep="")
+                            str <- paste(paste("FF.ExtractFormulaHistory(\"",as.character(isin),"\"",sep=""), ",", fs_str,")",sep="")
+                            # FF.ExtractFormulaHistory("002826", P_PRICE_AVG(20120101,20121231,D,USD))
+                            data <- FF.ExtractFormulaHistory(as.character(isin), fs_str)
+                            
+                        } else if( grepl("^FF_", param) || grepl("^FG_", param)){
+                            # FF.ExtractFormulaHistory("002826", "P_PRICE_AVG", "20120101:20121231:D","curr=USD"))
+                            data <- FF.ExtractFormulaHistory(as.character(isin),
+                                                         param,
+                                                         paste(t0,t1,freq,sep=":"),
+                                                         paste("curr=",curr,sep=""))
+                        } else {
+                            print(paste("I don't know what to do with this FS param:", param))
+                        }
+
                     }, error=function(msg){
                         print(paste("ERROR!!!", msg))
                         next
@@ -163,7 +177,7 @@ download <- function(config_file) {
                     non_nan <- !is.na(data[3])
                     tseries <- as.data.frame(cbind(data[2][non_nan], data[3][non_nan]))
                     colnames(tseries) <- c(paste("nr",nrow(tseries),sep=""), curr)
-                    
+
                     if( !is.null(master_data) ){
                         master_data <- merge(x=master_data, 
                                          y=tseries, 

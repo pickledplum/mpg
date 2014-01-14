@@ -4,10 +4,10 @@ source("logger.r")
 FILL_COUNTRY <- TRUE
 FILL_COMPANY <- TRUE
 
-populate_meta_tables <- function(conn, meta_data_source ){
-    company_file_list <- meta_data_source[[2]] 
-    market_designations <- meta_data_source[[3]]
+populate_meta_tables <- function(conn,meta_data_source ){
 
+    company_file_list <- meta_data_source[[1]] 
+    market_designations <- meta_data_source[[2]]
     hash <- new.env(hash=TRUE)
     for( i in seq(1,length(market_designations))){
         
