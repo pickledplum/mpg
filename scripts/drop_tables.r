@@ -7,7 +7,7 @@ drop_tables <- function(conn, exclude=c("company", "country")){
     
     apply(table_list, 1, function(x){
         if( x %in% exclude){
-        return(NULL)
+            return(NULL)
         }
         q_str <- paste("DROP TABLE IF EXISTS '", x, "'", sep="")
         print(q_str)

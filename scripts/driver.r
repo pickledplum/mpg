@@ -18,7 +18,6 @@ DO_CREATE_METATABLES <- TRUE
 
 DO_POPULATE_DATATABLES <- TRUE
 
-
 db <- "D:/home/honda/sqlite-db/financial.sqlite3"
 config_file <- "/home/honda/mpg/dummy/params.conf"
 config <- read_config(config_file) # returns an environment
@@ -45,14 +44,16 @@ company_file_list <- c( "D:/home/honda/mpg/dummy/fs_output/dummy-company-info.tx
                         "D:/home/honda/mpg/developed/fs_output/ex-dm-company-info.txt" 
 )
 market_designations <- c("dummy", "NULL", "fm", "em", "dm")
-groups <- c("dummy", "acwi", "fm", "em", "dm")
+index_designations <- c("dummy", "ACWI", "ETF-FM", "ETF-EM", "ETF-DM")
 meta_data_source <- data.frame(company_file_list[1], 
-                               market_designations[1], stringsAsFactors=FALSE)
-colnames(meta_data_source) <- c("company_infofile", "market")
-rownames(meta_data_source) <- groups[1]
+                               market_designations[1], 
+                               index_designations[1],
+                               stringsAsFactors=FALSE)
+colnames(meta_data_source) <- c("company_info", "market","index")
+rownames(meta_data_source) <- index_designations[1]
 
 if( DO_DROP ){
-    drop_tables(conn, exclude=c())
+    drop_tables(conn, exclude=c("company", "country"))
     log.info("Finished dropping tables")
 
 }

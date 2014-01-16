@@ -1,5 +1,6 @@
 index, descript, type
 ACWI,"All Country World Index",index
-EM, "iShare ETF Emerging Market", etf
-DM, "iShare ETF Developed Market", etf
-FM, "iShare ETF Frontier Market", etf
+ETF-EM, "iShare ETF Emerging Market", etf
+ETF-DM, "iShare ETF Developed Market", etf
+ETF-FM, "iShare ETF Frontier Market", etf
+dummy,"dummy ACWI", index
