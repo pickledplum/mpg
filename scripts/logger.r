@@ -4,16 +4,20 @@ logger.INFO=3
 logger.WARN=4
 logger.ERROR=5
 
-logger.logfile <- NULL
-logger.level <- logger.INFO
-logger.do_stdout <- TRUE
+logger.logfile <<- NULL
+logger.level <<- logger.INFO
+logger.do_stdout <<- TRUE
 
 logger.init <- function(level, do_stdout=TRUE, logfile=NULL) {
-    logger.logfile <- logfile
-    logger.level <- level
-    logger.do_stdout <- do_stdout
+    logger.logfile <<- file(logfile, open="w",blocking=FALSE)
+    logger.level <<- level
+    logger.do_stdout <<- do_stdout
 }
-
+logger.close <- function() {
+    if( !is.null(logger.logfile) ) {
+        close(logger.logfile)
+    }
+}
 logger.error <- function(msg){
     logger.logmsg(logger.ERROR, msg)
 }
@@ -43,8 +47,7 @@ logger.logmsg <- function(level, msg){
     msggg <- paste(t, level_str, "-", msg)
     if( level >= logger.level ){
         if( !is.null(logger.logfile) ){
-            con <- file(logger.logfile, open="w+", blocking=FALSE)
-            writeLines(msggg, con)
+            writeLines(msggg, logger.logfile)
                 
         }
         if( logger.do_stdout ){
