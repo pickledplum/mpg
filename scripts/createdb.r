@@ -2,28 +2,33 @@
 library(tools)
 library(FactSetOnDemand)
 library(xts)
+library(RSQLite)
 source("read_config.r")
-source('logger.r"')
+source("logger.r")
+
+MAX_NTRIALS <- 5
 
 db <- "D:/home/honda/sqlite-db/mini.sqlite"
 
 config_file <- "/home/honda/mpg/dummy/createdb.conf"
 config <- read_config(config_file) # returns an environment
 wkdir <- get("WORKING_DIR", envir=config)
-#on.exit(exit_f)
 
 timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 logfile <- file.path(wkdir, paste("dummy", ".log",sep=""))
-logger.init(level=logger.INFO,
+logger.init(level=logger.DEBUG,
             do_stdout=TRUE,
             logfile=logfile)
-)
+
 print(paste("Log file:", logfile))
 
 conn <<- dbConnect( SQLite(), db )
 logger.info(paste("Opened SQLite database:", db))
 on.exit( function(conn) {
+    
     dbDisconnect(conn)
+    logger.info("Closed db")
+    logger.info("Good bye!")
 })
 
 ########################################
@@ -31,13 +36,13 @@ on.exit( function(conn) {
 ########################################
 # Query time out.  Default is 120 secs.  120-3600 secs on client side.
 FactSet.setConfigurationItem( FactSet.TIMEOUT, 900 )
-logger.info("paste(FactSet timetout:", 900, "secs"))
+logger.info(paste("FactSet timetout:", 900, "secs"))
 
 ########################################
 # Load config
 ########################################
 config <- read_config(config_file) # returns an environment
-log.debug(paste("Loaded config:", config_file))
+logger.debug(paste("Loaded config:", config_file))
 
 wkdir <- ""
 portfolio_ofdb <- ""
@@ -47,8 +52,12 @@ t0 <- ""
 t1 <- ""
 default_currency <- ""
 
-stopifnot( exists("wkdir", envir=config) )
-wkdir <- get("wkdir", mode="character", envir=config) 
+stopifnot( exists("WORKING_DIR", envir=config) )
+wkdir <- get("WORKING_DIR", mode="character", envir=config) 
+if( !file.exists(wkdir) ){
+    logger.warn(paste(wkdir, " does not exist.  Creating..."))
+    dir.create(wkdir)
+}
 stopifnot( file.exists(wkdir) )
 
 stopifnot( exists("OUTPUT_PREFIX", envir=config) )
@@ -60,10 +69,12 @@ if(is.null(prefix)){
 stopifnot( exists("T0", envir=config) )
 t0 <- get("T0", mode="character", envir=config) # "1980-01-01" NOTE: implement "last"?
 stopifnot(grepl("[[:digit:]]+{4}-[[:digit:]]+{2}-[[:digit:]]+{2}", t0))
+fs.t0 <- gsub("-", "", t0)
 
 stopifnot( exists("T1", envir=config) )
 t1 <- get("T1", mode="character", envir=config) # "1980-12-12" "now"
 stopifnot(grepl("[[:digit:]]+{4}-[[:digit:]]+{2}-[[:digit:]]+{2}", t1))
+fs.t1 <- gsub("-", "", t1)
 
 stopifnot( exists("DEFAULT_CURRENCY", envir=config) )
 default_currency <- get("DEFAULT_CURRENCY", mode="character", envir=config) # USD
@@ -71,7 +82,7 @@ stopifnot( toupper(default_currency) %in% c("USD","LOCAL") )
 
 stopifnot( exists("MARKET", envir=config) )
 finance.market <- get("MARKET", mode="character", envir=config)
-stopifnot( toupper(default_currency) %in% c("MIXED", "EM", "DM", "FM") )
+stopifnot( toupper(finance.market) %in% c("MIXED", "EM", "DM", "FM") )
 
 stopifnot( exists("INDEX", envir=config) )
 finance.index <- get("INDEX", mode="character", envir=config)
@@ -115,15 +126,15 @@ fs_prefix <- get("FACTSET_PREFIX", envir=config)
 logger.info(paste("FACTSET_PREFIX:", fs_prefix))
 
 fs_prefix_pattern <- paste("^", fs_prefix, sep="")
-config_param_list <- grep(fs_prefix_pattern, ls(config), value=TRUE)
-config_param_list <- config_param_list[-c(which(config_param_list=="FACTSET_PREFIX"))]   
+config_param_list <- grep(fs_prefix_pattern, ls(config), value=TRUE) 
 param_list <- gsub(fs_prefix_pattern, "", config_param_list)
 logger.info(paste("FACTSET items:", paste(param_list, collapse=",")))
+
 
 ########################################
 # Create Country Table
 ########################################
-q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEST(50), exchange TEXT(50), currency_code VARCHAR(3), currency TEXT(100))"
+q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEST(50), exchange TEXT(50), curr_iso VARCHAR(3), curr TEXT(100), market VARCHAR(25))"
 tryCatch({
     dbSendQuery(conn, q_str)
 }, error = function(msg){
@@ -143,13 +154,6 @@ tryCatch({
 )
 logger.info("Created company table")
 for( fsid in universe ) {
-    
-    
-    #######################################
-    #######################################
-    # DEBUG FROM HERE!!! 1/15/2015
-    #######################################
-    #######################################
     # get company basics
     #
     # company name
@@ -160,65 +164,94 @@ for( fsid in universe ) {
     # currency 3 letter code
     # isin
     # SEDOL
-    comp.info <- FF.ExtractDataSnapshot(fsid, "FG_COMPANY_NAME,P_DCOUNTRY,P_DCOUNTRY(REG),P_EXCHANGE,P_CURRENCY,P_CURRENCY_CODE,FE_COMPANY_INFO(ISIN),FE_COMPANY_INFO(SEDOL)")
-    company.name <- comp.info[[3]]
-    company.country <- comp.info[[4]]
-    company.region <- comp.info[[5]]
-    company.exchange <- comp.info[[6]]
-    company.curr <- comp.info[[7]]
-    company.curr_code <- comp.info[[8]]
-    company.isin <- comp.info[[9]]
-    company.sedol <- company.info[[10]]
-    company.market <- "prefix"
+    company <- FF.ExtractDataSnapshot(fsid, "FG_COMPANY_NAME,P_DCOUNTRY,P_DCOUNTRY(REG),P_EXCHANGE,P_CURRENCY,P_CURRENCY_CODE,FE_COMPANY_INFO(ISIN),FE_COMPANY_INFO(SEDOL)")
+    colnames(company) <- c("id", "date", "name", "country", "region", "exchange", "curr", "curr_code", "isin", "sedol")
+    finance.market <- prefix
     # register the country if not registered
-    q_str <- paste("SELECT country_id FROM country WHERE country='", company.country, "'",sep="")
-    logger.debug(q_str)
+    q_str <- paste("SELECT country_id FROM country WHERE country='", company$country, "'",sep="")
+    logger.debug(q_str)   
     tryCatch({
-        res <- dbGetQuery(conn, q_str)
-        
-    }, error=function(e){
-         logger.warn(e)
-         next
-     }
-    )
-    if( nrow(res) > 0 ){
-        logger.debug(paste("Already registered in the country table:", country)
-        next
-    }
-    value_list <- c(company.country, 
-                    company.region, 
-                    company.exchange,
-                    company.curr,
-                    company.curr_code,
-                    company.isin,
-                    company.sedol,
-                    finance.market)       
-    q_str <- paste("INSERT OR REPLACE INTO country (country,region,exchange,curr,curr_iso,isin,sedol,market) VALUES",
-                   "(",
-                   paste("\"", value_list, "\"", sep="", collapse=","),
-                   ")",
-                   sep="")
-    logger.debug(q_str)
-    tryCatch({
-        dbSendQuery(conn, q_str)
-                         
-        }, error=function(e){ 
-            logger.error(e)
+        country <- dbGetQuery(conn, q_str)
+        }, error=function(e){
+            logger.warn(e)
             next
         }
     )
+    if( nrow(country) > 0 ){
+        logger.debug(paste("Already registered in the country table:", company$country))
+    } else {
     
+        value_list <- c(company$country, 
+                        company$region, 
+                        company$exchange,
+                        company$curr,
+                        company$curr_code,
+                        finance.market)       
+        q_str <- paste("INSERT OR REPLACE INTO country (country,region,exchange,curr,curr_iso,market) VALUES",
+                       "(",
+                       paste("\"", value_list, "\"", sep="", collapse=","),
+                       ")",
+                       sep="")
+        logger.debug(q_str)
+        tryCatch({
+            dbSendQuery(conn, q_str)
+                             
+            }, error=function(e){ 
+                logger.error(e)
+                next
+            }
+        )
+        q_str <- paste("SELECT country_id FROM country WHERE country='", company$country, "'",sep="")
+        logger.debug(q_str)   
+        tryCatch({
+            country <- dbGetQuery(conn, q_str)
+        }, error=function(e){
+            logger.warn(e)
+            next
+        }
+        )
+    }
+    val_list <- c(paste("\"", company$id, "\"", sep=""), paste("\"", company$name, "\"", sep=""), country$country_id)
+    val_liststr <- paste(val_list, collapse=",")
+    q_str <- paste("INSERT OR REPLACE INTO company (factset_id, company_name, country_id) VALUES (", val_liststr, ")", sep=""); 
+    logger.info(q_str)
+    tryCatch({
+        dbSendQuery(conn, q_str)
+    }, error=function(e){
+        logger.warn(e)
+        next
+    }
+    )
     # register company
     for( param in param_list ){
-        # create a subdirectory for this param
-        output_dir <- file.path(wkdir, param)
-        if( !file.exists(output_dir) ){
-            dir.create(output_dir, showWarnings=TRUE, recursive=FALSE, mode="0775")
+        tablename <- paste(param, fsid, sep="-")
+        q_str <- paste("CREATE TABLE IF NOT EXISTS \"", tablename, "\" (date INTEGER PRIMARY KEY NOT NULL UNIQUE, usd, local)", sep="")
+        logger.info(q_str)
+        ntrials <- 1
+        while( ntrials <= MAX_NTRIALS ){
+            tryCatch( {
+                
+                dbSendQuery(conn, q_str)
+                break
+
+                }, error=function(msg){
+                    if( ntrials > MAX_NTRIALS ){
+                        logger.error(msg)
+                        break
+                    }
+                    else{
+                        logger.warn(msg)
+                        ntrials <- ntrials+1
+                        Sys.sleep(1)
+                    }
+                }
+            )
         }
-        
+
         controls <- get(paste(fs_prefix, param, sep=""), envir=config)
         curr_list <- c(default_currency)
         freq_list <- c()
+        
         if( all("LOCAL" %in% controls) ) {
             if( default_currency != "LOCAL" ){
                 curr_list <- cbind(curr_list, "local")
@@ -241,76 +274,98 @@ for( fsid in universe ) {
         if( all("Y" %in% controls) ) {
             freq_list <- cbind(freq_list, "Y")
         }
-
         for( freq in freq_list ){
-
-            output_filename <- file.path(output_dir, 
-                                         paste(
-                                             paste(param, as.character(fsid), sep="-"),
-                                             ".csv", sep=""))
-            log.info(output_filename)
-            master_data = NULL
-            #browser()
+            master_data <- NULL
             for( curr in curr_list ){
+                fs_str2 <- paste(fs.t0, fs.t1, freq, sep=":")
+                data <- NULL
+
                 tryCatch({
-                    if( grepl("^P_", param) ){
-                        fs_str <- paste(param, "(", paste(t0,t1,freq,curr,sep=","),")",sep="")
-                        str <- paste(paste("FF.ExtractFormulaHistory(\"",as.character(fsid),"\"",sep=""), ",", fs_str,")",sep="")
-                        # FF.ExtractFormulaHistory("002826", P_PRICE_AVG(20120101,20121231,D,USD))
-                        data <- FF.ExtractFormulaHistory(as.character(fsid), fs_str)
-                        
+                    if( grepl("P_TOTAL_RETURNC", param) ){
+                        fs_str1 <- paste(param, "(", paste(fs.t0,fs.t1,freq,curr,sep=","), ")", sep="")
+                        # FF.ExtractFormulaHistory("002826", P_PRICE_AVG(20120101,20121231,D,USD), 20120101:20121231:D)
+                        data <- FF.ExtractFormulaHistory(as.character(fsid), fs_str1, fs_str2)
+                    } else if( grepl("P_PRICE_AVG", param) ){
+                        #FF.ExtractFormulaHistory('004561','P_PRICE_AVG(19800101,20131231,M,USD,4)','19800101:20131231:M')
+                        fs_str1 <- paste(param, "(", paste(fs.t0,fs.t1,freq,curr,4, sep=","), ")", sep="")                  
+                        data <- FF.ExtractFormulaHistory(as.character(fsid), fs_str1, fs_str2)
                     } else if( grepl("^FF_", param) || grepl("^FG_", param)){
-                        # FF.ExtractFormulaHistory("002826", "P_PRICE_AVG", "20120101:20121231:D","curr=USD"))
+                        # FF.ExtractFormulaHistory("002826", "FF_ASSETS", "20120101:20121231:D","curr=USD"))
                         data <- FF.ExtractFormulaHistory(as.character(fsid),
                                                      param,
-                                                     paste(t0,t1,freq,sep=":"),
+                                                     fs_str2,
                                                      paste("curr=",curr,sep=""))
                     } else {
-                        print(paste("I don't know what to do with this FS param:", param))
+                        logger.warn(paste("I don't know what to do with this FS param:", param))
                     }
 
                 }, error=function(msg){
-                    print(paste("ERROR!!!", msg))
+                    logger.error(paste("ERROR!!!", msg))
                     next
                 })
+
                 if( nrow(data) < 1 ){
-                    print("Empty data.  Skipping...")
+                    logger.warn("Empty data.  Skipping...")
                     next
                 }
-                non_nan <- !is.na(data[3])
-                tseries <- as.data.frame(cbind(data[2][non_nan], data[3][non_nan]))
-                colnames(tseries) <- c(paste("nr",nrow(tseries),sep=""), curr)
+                colnames(data) <- c("id", "date", curr)
+                #browser()
+                if( is.null(master_data) ){
+                    master_data <- data
+                } else {
+                    master_data <- merge(master_data, data, by=c("id", "date"))
+                }                
+            }
 
-                if( !is.null(master_data) ){
-                    master_data <- merge(x=master_data, 
-                                     y=tseries, 
-                                     by.x=colnames(tseries)[1],
-                                     by.y=colnames(master_data)[1],
-                                     all=TRUE)
-                }
-                else{
-                    master_data <- tseries
+            val_list <- apply(master_data, 1, function(row){ 
+                if(!all(is.na(row[3:length(row)])) ){
+                    j <- julian(as.Date(row[2]))
+                    paste("(", j, ",", paste(row[3:length(row)], collapse=","), ")", sep="")
+                } 
+            }
+            )
+
+            val_list <- Filter( function(x) {
+                if( is.null(x) ){
+                    return(FALSE)
+                } 
+                return(TRUE)
+            }, val_list)
+            
+            if( length(val_list) < 1 ){
+                logger.info("No non-NA data")
+                next   
+            }
+
+            for( begin in seq(1, length(val_list), 100) ){
+                end <- min(length(val_list), begin+100-1)
+                val_list[begin:end]
+
+                val_liststr <- paste(val_list[begin:end], collapse=",")
+                
+                q_str <- paste("INSERT OR REPLACE INTO \"", 
+                               tablename, 
+                               "\" (date,", paste(curr_list,collapse=","), ") VALUES ", val_liststr, "", sep="")
+                logger.info(q_str)
+                ntrials <- 0
+                while( ntrials <= MAX_NTRIALS ){
+                    tryCatch({
+                        
+                        dbSendQuery(conn, q_str)
+                        break
+                    }, error=function(msg){
+                        if( ntrials > MAX_NTRIALS ){
+                            logger.error(msg)
+                            break
+                        } else{
+                            logger.warn(msg)
+                            ntrials <- ntrials + 1
+                            Sys.sleep(1)
+                        }
+                    })
                 }
             }
-            
-            tryCatch({
-                fout <- file(output_filename, "w", blocking=FALSE)
-                colnames(master_data) <- c(paste("nr",nrow(master_data),sep=""),
-                                           colnames(master_data)[2:ncol(master_data)])
-                write.table(master_data, fout,
-                            quote=FALSE, 
-                            row.names=FALSE, 
-                            col.names=TRUE,
-                            sep=",")
-                
-                
-            }, error=function(msg){
-                print(paste("ERROR!!!", msg))
-                return(NULL)
-            }, finally=function(fout){
-                close(fout)
-            })
-            close(fout)
+
         }
     }
 }
