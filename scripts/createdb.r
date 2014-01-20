@@ -281,7 +281,7 @@ for( fsid in universe ) {
                 data <- NULL
 
                 tryCatch({
-                    if( grepl("P_TOTAL_RETURNC", param) ){
+                    if( grepl("P_TOTAL_RETURNC", param) || grepl("^FG_", param) ){
                         fs_str1 <- paste(param, "(", paste(fs.t0,fs.t1,freq,curr,sep=","), ")", sep="")
                         # FF.ExtractFormulaHistory("002826", P_PRICE_AVG(20120101,20121231,D,USD), 20120101:20121231:D)
                         data <- FF.ExtractFormulaHistory(as.character(fsid), fs_str1, fs_str2)
@@ -289,7 +289,7 @@ for( fsid in universe ) {
                         #FF.ExtractFormulaHistory('004561','P_PRICE_AVG(19800101,20131231,M,USD,4)','19800101:20131231:M')
                         fs_str1 <- paste(param, "(", paste(fs.t0,fs.t1,freq,curr,4, sep=","), ")", sep="")                  
                         data <- FF.ExtractFormulaHistory(as.character(fsid), fs_str1, fs_str2)
-                    } else if( grepl("^FF_", param) || grepl("^FG_", param)){
+                    } else if( grepl("^FF_", param) ){
                         # FF.ExtractFormulaHistory("002826", "FF_ASSETS", "20120101:20121231:D","curr=USD"))
                         data <- FF.ExtractFormulaHistory(as.character(fsid),
                                                      param,
@@ -369,4 +369,7 @@ for( fsid in universe ) {
         }
     }
 }
-
+dbCommit(conn)
+dbDisconnect(conn)
+logger.info("Closed db")
+logger.info("Good bye!")
