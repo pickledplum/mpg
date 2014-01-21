@@ -11,10 +11,10 @@ trySendQuery <- function(conn, q_str, max_trials=1){
         }, error = function(msg){
             nfailure = nfailure + 1
             if( nfailure > max_trials){
-                logger.error(msg)
+                logger.error(paste(nfailure, "th failure:", msg, sep=""))
                 stop()
             }
-            logger.warn(msg)
+            logger.warn(paste(nfailure, "th failure:", msg, sep=""))
             Sys.sleep(1)
         }
         )
@@ -30,10 +30,10 @@ tryGetQuery <- function(conn, q_str, max_trials=1){
         }, error = function(msg){
             nfailure = nfailure + 1
             if( nfailure > max_trials){
-                logger.error(msg)
+                logger.error(paste(nfailure, "th failure:", msg, sep=""))
                 stop()
             }
-            logger.warn(msg)
+            logger.warn(paste(nfailure, "th failure:", msg, sep=""))
             Sys.sleep(1)
         }
         )
