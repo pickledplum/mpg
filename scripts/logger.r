@@ -48,10 +48,11 @@ logger.logmsg <- function(level, msg){
     if( level >= logger.level ){
         if( !is.null(logger.logfile) ){
             writeLines(msggg, logger.logfile)
-                
+            #flush(logger.logfile)   
         }
         if( logger.do_stdout ){
             writeLines(msggg, stdout())
+            flush(stdout())
         }
     }
 }

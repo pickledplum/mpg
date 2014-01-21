@@ -1,11 +1,21 @@
 # Download specified FS parameters
-library(tools)
-library(FactSetOnDemand)
-library(xts)
-library(RSQLite)
-source("read_config.r")
-source("logger.r")
-
+tryCatch({
+    library(tools)
+    library(FactSetOnDemand)
+    library(xts)
+    library(RSQLite)
+    
+    source("read_config.r")
+    source("logger.r")
+    source("tryDb.r")
+}, warning=function(msg){
+    print(msg)
+    stop()
+}, error=function(msg){
+    print(msg)
+    stop()
+}
+)
 MAX_NTRIALS <- 5
 
 db <- "D:/home/honda/sqlite-db/mini.sqlite"
@@ -16,7 +26,7 @@ wkdir <- get("WORKING_DIR", envir=config)
 
 timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 logfile <- file.path(wkdir, paste("dummy", ".log",sep=""))
-logger.init(level=logger.DEBUG,
+logger.init(level=logger.INFO,
             do_stdout=TRUE,
             logfile=logfile)
 
@@ -24,12 +34,13 @@ print(paste("Log file:", logfile))
 
 conn <<- dbConnect( SQLite(), db )
 logger.info(paste("Opened SQLite database:", db))
-on.exit( function(conn) {
-    
-    dbDisconnect(conn)
-    logger.info("Closed db")
-    logger.info("Good bye!")
-})
+# on.exit( function(conn) {
+# 
+#     dbDisconnect(conn)
+#     logger.info("Closed db")
+#     logger.info("Good bye!")
+#     logger.close()
+# })
 
 ########################################
 # Configure FS
@@ -42,7 +53,7 @@ logger.info(paste("FactSet timetout:", 900, "secs"))
 # Load config
 ########################################
 config <- read_config(config_file) # returns an environment
-logger.debug(paste("Loaded config:", config_file))
+logger.info(paste("Loaded config:", config_file))
 
 wkdir <- ""
 portfolio_ofdb <- ""
@@ -55,7 +66,7 @@ default_currency <- ""
 stopifnot( exists("WORKING_DIR", envir=config) )
 wkdir <- get("WORKING_DIR", mode="character", envir=config) 
 if( !file.exists(wkdir) ){
-    logger.warn(paste(wkdir, " does not exist.  Creating..."))
+    logger.warn(paste("Directory does not exist.  Creating...:", wkdir))
     dir.create(wkdir)
 }
 stopifnot( file.exists(wkdir) )
@@ -91,6 +102,7 @@ if( exists("PORTFOLIO_OFDB", envir=config) ){
     portfolio_ofdb <- get("PORTFOLIO_OFDB", mode="character", envir=config) # "PERSONAL:HONDA_MSCI_ACWI_ETF"
     stopifnot( !is.null(portfolio_ofdb) && portfolio_ofdb != "" )
     data <- FF.ExtractOFDBUniverse(portfolio_ofdb, "0O")
+    logger.info(paste("Loaded universe from", portfolio_ofdb))
     universe <- data$Id
     
 } else if( exists("UNIVERSE", envir=config) ){
@@ -101,6 +113,7 @@ if( exists("PORTFOLIO_OFDB", envir=config) ){
     temp <- read.table(unicon, colClasses=c("character"), header=TRUE, strip.white=TRUE, blank.lines.skip=TRUE, comment.char="#")
     universe <-temp[[1]]
     close(unicon)
+    logger.info(paste("Loaded universe from file:", universe_file))
     
 } else{
     #error
@@ -113,9 +126,11 @@ if( length(universe) == 0){
 
 logger.info(paste("UNIVERSE(", length(universe), "): ", paste(universe, collapse=",")))
 logger.info(paste("WORKING_DIR:", wkdir))
-logger.info(paste("PREFIX:", prefix))
+logger.info(paste("OUTPUT_PREFIX:", prefix))
 logger.info(paste("T0,T1:", t0,",",t1))
 logger.info(paste("DEFAULT_CURRENCY:", default_currency))
+logger.info(paste("MARKET:", finance.market))
+logger.info(paste("INDEX:", finance.index))
 
 ########################################
 # Extract FactSet parameter strings
@@ -135,24 +150,19 @@ logger.info(paste("FACTSET items:", paste(param_list, collapse=",")))
 # Create Country Table
 ########################################
 q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEST(50), exchange TEXT(50), curr_iso VARCHAR(3), curr TEXT(100), market VARCHAR(25))"
-tryCatch({
-    dbSendQuery(conn, q_str)
-}, error = function(msg){
-    stop(msg)
-}
-)
-logger.info("Created country table")
+trySendQuery(conn, q_str)
+logger.info("Created COUNTRY table")
+
 ########################################
-# Download & Create Tables
+# Create COMPANY table
 ########################################
 q_str <- "CREATE TABLE IF NOT EXISTS company (factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE, company_name TEXT(100), country_id INTEGER, FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE)"
-tryCatch({
-    dbSendQuery(conn, q_str)
-}, error = function(msg){
-    stop(msg)
-}
-)
-logger.info("Created company table")
+trySendQuery(conn, q_str)
+logger.info("Created COMPANY table")
+
+########################################
+# Create param-company tables
+########################################
 for( fsid in universe ) {
     # get company basics
     #
@@ -169,18 +179,12 @@ for( fsid in universe ) {
     finance.market <- prefix
     # register the country if not registered
     q_str <- paste("SELECT country_id FROM country WHERE country='", company$country, "'",sep="")
-    logger.debug(q_str)   
-    tryCatch({
-        country <- dbGetQuery(conn, q_str)
-        }, error=function(e){
-            logger.warn(e)
-            next
-        }
-    )
-    if( nrow(country) > 0 ){
-        logger.debug(paste("Already registered in the country table:", company$country))
-    } else {
+    logger.debug(q_str)  
+    tryGetQuery(conn, q_str, MAX_NTRIALS)
     
+    if( nrow(country) > 0 ){
+        logger.debug(paste("Found the entry in the country table:", company$country))
+    } else {
         value_list <- c(company$country, 
                         company$region, 
                         company$exchange,
@@ -193,60 +197,27 @@ for( fsid in universe ) {
                        ")",
                        sep="")
         logger.debug(q_str)
-        tryCatch({
-            dbSendQuery(conn, q_str)
-                             
-            }, error=function(e){ 
-                logger.error(e)
-                next
-            }
-        )
+        trySendQuery(conn, q_str, MAX_NTRIALS)
+        logger.info("Registered to the country table:", company$country)
+        
         q_str <- paste("SELECT country_id FROM country WHERE country='", company$country, "'",sep="")
         logger.debug(q_str)   
-        tryCatch({
-            country <- dbGetQuery(conn, q_str)
-        }, error=function(e){
-            logger.warn(e)
-            next
-        }
-        )
+        tryGetQuery(conn, q_str, MAX_TRIALS)
     }
     val_list <- c(paste("\"", company$id, "\"", sep=""), paste("\"", company$name, "\"", sep=""), country$country_id)
     val_liststr <- paste(val_list, collapse=",")
     q_str <- paste("INSERT OR REPLACE INTO company (factset_id, company_name, country_id) VALUES (", val_liststr, ")", sep=""); 
-    logger.info(q_str)
-    tryCatch({
-        dbSendQuery(conn, q_str)
-    }, error=function(e){
-        logger.warn(e)
-        next
-    }
-    )
+    logger.debug(q_str)
+    trySendQuery(conn, q_str, MAX_NTRIALS)
+    logger.info(paste("Registered to the company table:", val_liststr))
+    
     # register company
     for( param in param_list ){
         tablename <- paste(param, fsid, sep="-")
         q_str <- paste("CREATE TABLE IF NOT EXISTS \"", tablename, "\" (date INTEGER PRIMARY KEY NOT NULL UNIQUE, usd, local)", sep="")
-        logger.info(q_str)
-        ntrials <- 1
-        while( ntrials <= MAX_NTRIALS ){
-            tryCatch( {
-                
-                dbSendQuery(conn, q_str)
-                break
-
-                }, error=function(msg){
-                    if( ntrials > MAX_NTRIALS ){
-                        logger.error(msg)
-                        break
-                    }
-                    else{
-                        logger.warn(msg)
-                        ntrials <- ntrials+1
-                        Sys.sleep(1)
-                    }
-                }
-            )
-        }
+        logger.debug(q_str)
+        trySendQuery(conn, q_str, MAX_NTRIALS)
+        logger.info(paste("Created table:", tablename))
 
         controls <- get(paste(fs_prefix, param, sep=""), envir=config)
         curr_list <- c(default_currency)
@@ -300,7 +271,7 @@ for( fsid in universe ) {
                     }
 
                 }, error=function(msg){
-                    logger.error(paste("ERROR!!!", msg))
+                    logger.error(msg)
                     next
                 })
 
@@ -333,7 +304,7 @@ for( fsid in universe ) {
             }, val_list)
             
             if( length(val_list) < 1 ){
-                logger.info("No non-NA data")
+                logger.debug("No non-NA data")
                 next   
             }
 
@@ -346,30 +317,16 @@ for( fsid in universe ) {
                 q_str <- paste("INSERT OR REPLACE INTO \"", 
                                tablename, 
                                "\" (date,", paste(curr_list,collapse=","), ") VALUES ", val_liststr, "", sep="")
-                logger.info(q_str)
-                ntrials <- 0
-                while( ntrials <= MAX_NTRIALS ){
-                    tryCatch({
-                        
-                        dbSendQuery(conn, q_str)
-                        break
-                    }, error=function(msg){
-                        if( ntrials > MAX_NTRIALS ){
-                            logger.error(msg)
-                            break
-                        } else{
-                            logger.warn(msg)
-                            ntrials <- ntrials + 1
-                            Sys.sleep(1)
-                        }
-                    })
-                }
+                logger.debug(q_str)
+                trySendQuery(conn, q_str, MAX_NTRIALS )
             }
 
         }
     }
 }
+
 dbCommit(conn)
 dbDisconnect(conn)
 logger.info("Closed db")
-logger.info("Good bye!")
+logger.info("Good day!")
+logger.close()
