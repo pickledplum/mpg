@@ -16,7 +16,7 @@ tryCatch({
     stop()
 }
 )
-MAX_NTRIALS <- 5
+MAX_TRIALS <- 5
 
 db <- "D:/home/honda/sqlite-db/mini.sqlite"
 
@@ -92,8 +92,8 @@ default_currency <- get("DEFAULT_CURRENCY", mode="character", envir=config) # US
 stopifnot( toupper(default_currency) %in% c("USD","LOCAL") )
 
 stopifnot( exists("MARKET", envir=config) )
-finance.market <- get("MARKET", mode="character", envir=config)
-stopifnot( toupper(finance.market) %in% c("MIXED", "EM", "DM", "FM") )
+market <- get("MARKET", mode="character", envir=config)
+stopifnot( toupper(market) %in% c("MIXED", "EM", "DM", "FM") )
 
 stopifnot( exists("INDEX", envir=config) )
 finance.index <- get("INDEX", mode="character", envir=config)
@@ -129,7 +129,7 @@ logger.info(paste("WORKING_DIR:", wkdir))
 logger.info(paste("OUTPUT_PREFIX:", prefix))
 logger.info(paste("T0,T1:", t0,",",t1))
 logger.info(paste("DEFAULT_CURRENCY:", default_currency))
-logger.info(paste("MARKET:", finance.market))
+logger.info(paste("MARKET:", market))
 logger.info(paste("INDEX:", finance.index))
 
 ########################################
@@ -145,43 +145,122 @@ config_param_list <- grep(fs_prefix_pattern, ls(config), value=TRUE)
 param_list <- gsub(fs_prefix_pattern, "", config_param_list)
 logger.info(paste("FACTSET items:", paste(param_list, collapse=",")))
 
-
 ########################################
 # Create Country Table
 ########################################
 q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEST(50), exchange TEXT(50), curr_iso VARCHAR(3), curr TEXT(100), market VARCHAR(25))"
-trySendQuery(conn, q_str)
+stopifnot(!is.null(trySendQuery(conn, q_str)))
 logger.info("Created COUNTRY table")
-
 ########################################
 # Create COMPANY table
 ########################################
-q_str <- "CREATE TABLE IF NOT EXISTS company (factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE, company_name TEXT(100), country_id INTEGER, FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE)"
-trySendQuery(conn, q_str)
+q_str <- "CREATE TABLE IF NOT EXISTS company (factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE, company_name TEXT(100), country_id INTEGER, sector_id,indgrp_id,industry_id,subind_id,FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(sector_id) REFERENCES sector(sector_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(indgrp_id) REFERENCES indgrp(indgrp_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(industry_id) REFERENCES industry(industry_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(subind_id) REFERENCES subind(subind_id) ON DELETE NO ACTION ON UPDATE CASCADE)"
+stopifnot(!is.null(trySendQuery(conn, q_str)))
 logger.info("Created COMPANY table")
+########################################
+# Create (industrial) SECTOR table
+########################################
+q_str <- "CREATE TABLE IF NOT EXISTS sector (sector_id INTEGER PRIMARY KEY NOT NULL UNIQUE, sector_name TEXT(100) NOT NULL UNIQUE)"
+stopifnot(!is.null(trySendQuery(conn, q_str)))
+logger.info("Created SECTOR table")
+########################################
+# Create INDGRP table
+########################################
+q_str <- "CREATE TABLE IF NOT EXISTS indgrp (indgrp_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, indgrp_name TEXT(100) NOT NULL UNIQUE)"
+stopifnot(!is.null(trySendQuery(conn, q_str)))
+logger.info("Created INDGRP table")
+########################################
+# Create INDUSTRY table
+########################################
+q_str <- "CREATE TABLE IF NOT EXISTS industry (industry_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, industry_name TEXT(100) NOT NULL UNIQUE)"
+stopifnot(!is.null(trySendQuery(conn, q_str)))
+logger.info("Created INDUSTRY table")
+########################################
+# Create SUBIND table
+########################################
+q_str <- "CREATE TABLE IF NOT EXISTS subind (subind_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, subind_name TEXT(100) NOT NULL UNIQUE)"
+stopifnot(!is.null(trySendQuery(conn, q_str)))
+logger.info("Created SUBIND table")
+########################################
+# Create CATEGORY table
+########################################
+q_str <- "CREATE TABLE IF NOT EXISTS category (category_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, category_name TEXT(50) NOT NULL UNIQUE)"
+trySendQuery(conn, q_str)
+logger.info("Created CATEGORY table")
+q_str <- "INSERT OR REPLACE INTO category (category_name) VALUES ('company fundamental'), ('price'), ('company meta'), ('country fundamental')"
+stopifnot(!is.null(trySendQuery(conn, q_str)))
+########################################
+# Create FREQUENCY table
+########################################
+q_str <- "CREATE TABLE IF NOT EXISTS frequency (freq VARCHAR(1) PRIMARY KEY NOT NULL UNIQUE, freq_name VARCHAR(20) UNIQUE)"
+trySendQuery(conn, q_str)
+logger.info("Created CATEGORY table")
+q_str <- "INSERT OR REPLACE INTO frequency (freq, freq_name) VALUES ('Y','Anuual'),('S','Semiannual'),('Q','Quarterly'),('M','Monthly'),('D','Daily')"
+stopifnot(!is.null(trySendQuery(conn, q_str)))
+########################################
+# Create FACTLET table
+########################################
+q_str <- "CREATE TABLE IF NOT EXISTS factlet (factlet VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE, description TEXT(100), unit FLOAT, freq CHAR(1), note TEXT(200), category_id INTEGER, FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE NO ACTION ON UPDATE CASCADE, FOREIGN KEY(freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE )"
+stopifnot(!is.null(trySendQuery(conn, q_str)))
+logger.info("Created FACTLET table")
+########################################
+# Company meta data
+########################################
+# Company basics
+#
+# company name
+# country of operation
+# region of operation
+# exchange
+# currency
+# currency 3 letter code
+# isin
+# SEDOL
+# sector
+# industry group
+# industry
+# sub-industry
+#
+fs_company_meta_header <- c("FG_COMPANY_NAME",
+  "P_DCOUNTRY",
+  "P_DCOUNTRY(REG)",
+  "P_EXCHANGE",
+  "P_CURRENCY",
+  "P_CURRENCY_CODE",
+  "FE_COMPANY_INFO(ISIN)",
+  "FE_COMPANY_INFO(SEDOL)",
+  "FG_GICS_SECTOR",
+  "FG_GICS_INDGRP",
+  "FG_GICS_INDUSTRY",
+  "FG_GICS_SUBIND")
+
+fs_company_meta_colnames <- c("id", 
+  "date", 
+  "name", 
+  "country", 
+  "region", 
+  "exchange", 
+  "curr", 
+  "curr_code", 
+  "isin", 
+  "sedol",
+  "sector",
+  "indgrp",
+  "industry",
+  "subind")
 
 ########################################
 # Create param-company tables
 ########################################
 for( fsid in universe ) {
-    # get company basics
-    #
-    # company name
-    # country of operation
-    # region of operation
-    # exchange
-    # currency
-    # currency 3 letter code
-    # isin
-    # SEDOL
-    company <- FF.ExtractDataSnapshot(fsid, "FG_COMPANY_NAME,P_DCOUNTRY,P_DCOUNTRY(REG),P_EXCHANGE,P_CURRENCY,P_CURRENCY_CODE,FE_COMPANY_INFO(ISIN),FE_COMPANY_INFO(SEDOL)")
-    colnames(company) <- c("id", "date", "name", "country", "region", "exchange", "curr", "curr_code", "isin", "sedol")
-    finance.market <- prefix
+    # Company meta data
+    company <- FF.ExtractDataSnapshot(fsid, paste(fs_company_meta_list, collapse=","))
+    colnames(company) <- fs_company_meta_colnames
+    
     # register the country if not registered
     q_str <- paste("SELECT country_id FROM country WHERE country='", company$country, "'",sep="")
     logger.debug(q_str)  
-    tryGetQuery(conn, q_str, MAX_NTRIALS)
-    
+    country <- tryGetQuery(conn, q_str, MAX_TRIALS) 
     if( nrow(country) > 0 ){
         logger.debug(paste("Found the entry in the country table:", company$country))
     } else {
@@ -190,25 +269,132 @@ for( fsid in universe ) {
                         company$exchange,
                         company$curr,
                         company$curr_code,
-                        finance.market)       
+                        market
+                        )       
         q_str <- paste("INSERT OR REPLACE INTO country (country,region,exchange,curr,curr_iso,market) VALUES",
                        "(",
                        paste("\"", value_list, "\"", sep="", collapse=","),
                        ")",
                        sep="")
         logger.debug(q_str)
-        trySendQuery(conn, q_str, MAX_NTRIALS)
-        logger.info("Registered to the country table:", company$country)
+        trySendQuery(conn, q_str, MAX_TRIALS)
+        logger.info(paste("Registered to the country table:", company$country))
         
         q_str <- paste("SELECT country_id FROM country WHERE country='", company$country, "'",sep="")
         logger.debug(q_str)   
-        tryGetQuery(conn, q_str, MAX_TRIALS)
+        country <- tryGetQuery(conn, q_str, MAX_TRIALS)
     }
-    val_list <- c(paste("\"", company$id, "\"", sep=""), paste("\"", company$name, "\"", sep=""), country$country_id)
+    country_id <- "NULL"
+    if( nrow(country) > 0 && !is.null(country$country_id) ){
+        country_id <- country$country_id
+    }
+    # register the sector if not registered
+    q_str <- paste("SELECT sector_id FROM sector WHERE sector_name='", company$sector, "'",sep="")
+    logger.debug(q_str)  
+    sector <- tryGetQuery(conn, q_str, MAX_TRIALS)  
+    if( nrow(sector) > 0 ){
+        logger.debug(paste("Found the entry in the sector table:", company$sector))
+    } else {
+        if( !is.na(company$sector) ){      
+            q_str <- paste("INSERT OR REPLACE INTO sector (sector_name) VALUES",
+                           "('",company$sector,"')",
+                           sep="")
+            logger.debug(q_str)
+            trySendQuery(conn, q_str, MAX_TRIALS)
+            logger.info(paste("Registered to the sector table:", company$sector))
+            
+            q_str <- paste("SELECT sector_id FROM sector WHERE sector_name='", company$sector, "'",sep="")
+            logger.debug(q_str)   
+            sector <- tryGetQuery(conn, q_str, MAX_TRIALS)
+        }
+    }
+    sector_id <- "NULL"
+    if( nrow(sector) > 0 && !is.null(sector$sector_id) ){
+        sector_id <- sector$sector_id
+    }
+    # register the industry group if not registered
+    q_str <- paste("SELECT indgrp_id FROM indgrp WHERE indgrp_name='", company$indgrp, "'",sep="")
+    logger.debug(q_str)  
+    indgrp <- tryGetQuery(conn, q_str, MAX_TRIALS)  
+    if( nrow(indgrp) > 0 ){
+        logger.debug(paste("Found the entry in the indgrp table:", company$indgrp))
+    } else {
+        if( !is.na(company$indgrp) ){
+            q_str <- paste("INSERT OR REPLACE INTO indgrp (indgrp_name) VALUES",
+                           "('",company$indgrp,"')",
+                           sep="")
+            logger.debug(q_str)
+            trySendQuery(conn, q_str, MAX_TRIALS)
+            logger.info(paste("Registered to the indgrp table:", company$indgrp))
+            
+            q_str <- paste("SELECT indgrp_id FROM indgrp WHERE indgrp_name='", company$indgrp, "'",sep="")
+            logger.debug(q_str)   
+            indgrp <- tryGetQuery(conn, q_str, MAX_TRIALS)
+        }
+    }   
+    indgrp_id <- "NULL"
+    if( nrow(indgrp) > 0 && !is.null(indgrp$indgrp_id) ){
+        indgrp_id <- indgrp$indgrp_id
+    }
+    # register the industry if not registered
+    q_str <- paste("SELECT industry_id FROM industry WHERE industry_name='", company$industry, "'",sep="")
+    logger.debug(q_str)  
+    industry <- tryGetQuery(conn, q_str, MAX_TRIALS)  
+    if( nrow(industry) > 0 ){
+        logger.debug(paste("Found the entry in the industry table:", company$industry))
+    } else {
+        if( !is.na(company$industry)  ){
+            q_str <- paste("INSERT OR REPLACE INTO industry (industry_name) VALUES",
+                           "('",company$industry,"')",
+                           sep="")
+            logger.debug(q_str)
+            trySendQuery(conn, q_str, MAX_TRIALS)
+            logger.info(paste("Registered to the industry table:", company$industry))
+            
+            q_str <- paste("SELECT industry_id FROM industry WHERE industry_name='", company$industry, "'",sep="")
+            logger.debug(q_str)   
+            indgrp <- tryGetQuery(conn, q_str, MAX_TRIALS)
+        }
+    } 
+    iindustry_id <- "NULL"
+    if( nrow(industry) > 0 && !is.null(industry$industry_id) ){
+        industry_id <- industry$industry_id
+    }
+    # register the sub-industry if not registered
+    q_str <- paste("SELECT subind_id FROM subind WHERE subind_name='", company$subind, "'",sep="")
+    logger.debug(q_str)  
+    subind <- tryGetQuery(conn, q_str, MAX_TRIALS)  
+    if( nrow(subind) > 0 ){
+        logger.debug(paste("Found the entry in the subind table:", company$subind))
+    } else {
+        if( !is.na(company$subind) ){
+            q_str <- paste("INSERT OR REPLACE INTO subind (subind_name) VALUES",
+                           "('",company$subind,"')",
+                           sep="")
+            logger.debug(q_str)
+            trySendQuery(conn, q_str, MAX_TRIALS)
+            logger.info(paste("Registered to the subind table:", company$subind))
+            
+            q_str <- paste("SELECT subind_id FROM subind WHERE subind_name='", company$subind, "'",sep="")
+            logger.debug(q_str)   
+            subind <- tryGetQuery(conn, q_str, MAX_TRIALS)
+        }
+    } 
+    subind_id <- "NULL"
+    if( nrow(subind) > 0 && !is.null(subind$subind_id) ){
+        subind_id <- subind$subind_id
+    }
+    val_list <- c(paste("\"", company$id, "\"", sep=""), 
+                  paste("\"", company$name, "\"", sep=""), 
+                  country_id,
+                  sector_id,
+                  indgrp_id,
+                  industry_id,
+                  subind_id)
     val_liststr <- paste(val_list, collapse=",")
-    q_str <- paste("INSERT OR REPLACE INTO company (factset_id, company_name, country_id) VALUES (", val_liststr, ")", sep=""); 
+    q_str <- paste("INSERT OR REPLACE INTO company (factset_id,company_name,country_id,sector_id,indgrp_id,industry_id,subind_id) VALUES (", val_liststr, ")", sep=""); 
     logger.debug(q_str)
-    trySendQuery(conn, q_str, MAX_NTRIALS)
+    trySendQuery(conn, q_str, MAX_TRIALS)
     logger.info(paste("Registered to the company table:", val_liststr))
     
     # register company
@@ -216,7 +402,7 @@ for( fsid in universe ) {
         tablename <- paste(param, fsid, sep="-")
         q_str <- paste("CREATE TABLE IF NOT EXISTS \"", tablename, "\" (date INTEGER PRIMARY KEY NOT NULL UNIQUE, usd, local)", sep="")
         logger.debug(q_str)
-        trySendQuery(conn, q_str, MAX_NTRIALS)
+        trySendQuery(conn, q_str, MAX_TRIALS)
         logger.info(paste("Created table:", tablename))
 
         controls <- get(paste(fs_prefix, param, sep=""), envir=config)
@@ -261,7 +447,7 @@ for( fsid in universe ) {
                         fs_str1 <- paste(param, "(", paste(fs.t0,fs.t1,freq,curr,4, sep=","), ")", sep="")                  
                         data <- FF.ExtractFormulaHistory(as.character(fsid), fs_str1, fs_str2)
                     } else if( grepl("^FF_", param) ){
-                        # FF.ExtractFormulaHistory("002826", "FF_ASSETS", "20120101:20121231:D","curr=USD"))
+                        # FF.ExtractFormulaHistory("002826", "FF_ASSETS", "20120101:20121231:D","curr=USD")
                         data <- FF.ExtractFormulaHistory(as.character(fsid),
                                                      param,
                                                      fs_str2,
@@ -318,7 +504,7 @@ for( fsid in universe ) {
                                tablename, 
                                "\" (date,", paste(curr_list,collapse=","), ") VALUES ", val_liststr, "", sep="")
                 logger.debug(q_str)
-                trySendQuery(conn, q_str, MAX_NTRIALS )
+                trySendQuery(conn, q_str, MAX_TRIALS )
             }
 
         }
