@@ -8,6 +8,7 @@ tryCatch({
     source("read_config.r")
     source("logger.r")
     source("tryDb.r")
+    source("tryExtract.r")
 }, warning=function(msg){
     print(msg)
     stop()
@@ -146,6 +147,28 @@ param_list <- gsub(fs_prefix_pattern, "", config_param_list)
 logger.info(paste("FACTSET items:", paste(param_list, collapse=",")))
 
 ########################################
+# FQL map
+########################################
+stopifnot( exists("FQL_MAP", envir=config) )
+fql_map_filename <- get("FQL_MAP", envir=config)
+stopifnot(file.exists(fql_map_filename))
+fql_map <- read.csv(fql_map_filename)
+rownames(fql_map) <- fql_map$item
+
+tryExtract <- function(param, d1, d2, freq, curr) {
+    formula <- fql_map[param, ]$fql
+    formula <- gsub("<d1>",d1,formula)
+    formula <- gsub("<d2>",d2,formula)
+    formula <- gsub("<freq>",freq,formula)
+    formula <- gsub("<curr>",curr,formula)
+    formula <- gsub("<ID>", id, formula)
+    print(formula)
+    ret <- eval(parse(text=formula))
+    return(ret)
+}
+
+
+########################################
 # Create Country Table
 ########################################
 q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEST(50), exchange TEXT(50), curr_iso VARCHAR(3), curr TEXT(100), market VARCHAR(25))"
@@ -221,7 +244,7 @@ logger.info("Created FACTLET table")
 # industry
 # sub-industry
 #
-fs_company_meta_header <- c("FG_COMPANY_NAME",
+fs_company_meta_list <- c("FG_COMPANY_NAME",
   "P_DCOUNTRY",
   "P_DCOUNTRY(REG)",
   "P_EXCHANGE",
@@ -438,24 +461,7 @@ for( fsid in universe ) {
                 data <- NULL
 
                 tryCatch({
-                    if( grepl("P_TOTAL_RETURNC", param) || grepl("^FG_", param) ){
-                        fs_str1 <- paste(param, "(", paste(fs.t0,fs.t1,freq,curr,sep=","), ")", sep="")
-                        # FF.ExtractFormulaHistory("002826", P_PRICE_AVG(20120101,20121231,D,USD), 20120101:20121231:D)
-                        data <- FF.ExtractFormulaHistory(as.character(fsid), fs_str1, fs_str2)
-                    } else if( grepl("P_PRICE_AVG", param) ){
-                        #FF.ExtractFormulaHistory('004561','P_PRICE_AVG(19800101,20131231,M,USD,4)','19800101:20131231:M')
-                        fs_str1 <- paste(param, "(", paste(fs.t0,fs.t1,freq,curr,4, sep=","), ")", sep="")                  
-                        data <- FF.ExtractFormulaHistory(as.character(fsid), fs_str1, fs_str2)
-                    } else if( grepl("^FF_", param) ){
-                        # FF.ExtractFormulaHistory("002826", "FF_ASSETS", "20120101:20121231:D","curr=USD")
-                        data <- FF.ExtractFormulaHistory(as.character(fsid),
-                                                     param,
-                                                     fs_str2,
-                                                     paste("curr=",curr,sep=""))
-                    } else {
-                        logger.warn(paste("I don't know what to do with this FS param:", param))
-                    }
-
+                    data <- tryExtract(param, fs.t0, fs.t1, freq, curr)
                 }, error=function(msg){
                     logger.error(msg)
                     next
