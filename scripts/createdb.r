@@ -8,7 +8,10 @@ tryCatch({
     source("read_config.r")
     source("logger.r")
     source("tryDb.r")
+    source("assert.r")
     source("tryExtract.r")
+    source("is.emptry.r")
+    
 }, warning=function(msg){
     print(msg)
     stop()
@@ -27,7 +30,7 @@ wkdir <- get("WORKING_DIR", envir=config)
 
 timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 logfile <- file.path(wkdir, paste("dummy", ".log",sep=""))
-logger.init(level=logger.INFO,
+logger.init(level=logger.DEBUG,
             do_stdout=TRUE,
             logfile=logfile)
 
@@ -147,85 +150,177 @@ param_list <- gsub(fs_prefix_pattern, "", config_param_list)
 logger.info(paste("FACTSET items:", paste(param_list, collapse=",")))
 
 ########################################
+# Create Country Table
+########################################
+#q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEST(50), exchange TEXT(50), curr_iso VARCHAR(3), curr TEXT(100), market VARCHAR(25))"
+#stopifnot(trySendQuery(conn, q_str))
+specs <- c("country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE", 
+           "country TEXT(100)", 
+           "region TEST(50)", 
+           "exchange TEXT(50)", 
+           "curr_iso VARCHAR(3)", 
+           "curr TEXT(100)", 
+           "market VARCHAR(25)" )
+tryCreateTableIfNotExists(conn, "country", specs)
+logger.info("Created COUNTRY table")
+########################################
+# Create COMPANY table
+########################################
+#q_str <- "CREATE TABLE IF NOT EXISTS company (factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE, company_name TEXT(100), country_id INTEGER, sector_id,indgrp_id,industry_id,subind_id,FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(sector_id) REFERENCES sector(sector_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(indgrp_id) REFERENCES indgrp(indgrp_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(industry_id) REFERENCES industry(industry_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(subind_id) REFERENCES subind(subind_id) ON DELETE NO ACTION ON UPDATE CASCADE)"
+#stopifnot(trySendQuery(conn, q_str))
+specs <- c("factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE", 
+           "company_name TEXT(100)", 
+           "country_id INTEGER", 
+           "sector_id",
+           "indgrp_id",
+           "industry_id",
+           "subind_id",
+           "FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE",
+           "FOREIGN KEY(sector_id) REFERENCES sector(sector_id) ON DELETE NO ACTION ON UPDATE CASCADE",
+           "FOREIGN KEY(indgrp_id) REFERENCES indgrp(indgrp_id) ON DELETE NO ACTION ON UPDATE CASCADE",
+           "FOREIGN KEY(industry_id) REFERENCES industry(industry_id) ON DELETE NO ACTION ON UPDATE CASCADE",
+           "FOREIGN KEY(subind_id) REFERENCES subind(subind_id) ON DELETE NO ACTION ON UPDATE CASCADE"
+)
+
+tryCreateTableIfNotExists(conn, "company", specs)
+logger.info("Created COMPANY table")
+########################################
+# Create (industrial) SECTOR table
+########################################
+#q_str <- "CREATE TABLE IF NOT EXISTS sector (sector_id INTEGER PRIMARY KEY NOT NULL UNIQUE, sector_name TEXT(100) NOT NULL UNIQUE)"
+#stopifnot(trySendQuery(conn, q_str))
+specs <- c("sector_id INTEGER PRIMARY KEY NOT NULL UNIQUE", 
+           "sector_name TEXT(100) NOT NULL UNIQUE"
+)
+tryCreateTableIfNotExists(conn, "sector", specs)
+logger.info("Created SECTOR table")
+########################################
+# Create INDGRP table
+########################################
+#q_str <- "CREATE TABLE IF NOT EXISTS indgrp (indgrp_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, indgrp_name TEXT(100) NOT NULL UNIQUE)"
+#stopifnot(trySendQuery(conn, q_str))
+specs <- c("indgrp_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE", 
+           "indgrp_name TEXT(100) NOT NULL UNIQUE"
+)
+tryCreateTableIfNotExists(conn, "indgrp", specs)
+logger.info("Created INDGRP table")
+########################################
+# Create INDUSTRY table
+########################################
+#q_str <- "CREATE TABLE IF NOT EXISTS industry (industry_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, industry_name TEXT(100) NOT NULL UNIQUE)"
+#stopifnot(trySendQuery(conn, q_str))
+specs <- c("industry_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE", 
+           "industry_name TEXT(100) NOT NULL UNIQUE"
+)
+tryCreateTableIfNotExists(conn, "industry", specs)
+logger.info("Created INDUSTRY table")
+########################################
+# Create SUBIND table
+########################################
+#q_str <- "CREATE TABLE IF NOT EXISTS subind (subind_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, subind_name TEXT(100) NOT NULL UNIQUE)"
+#stopifnot(trySendQuery(conn, q_str))
+specs <- c("subind_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE", 
+           "subind_name TEXT(100) NOT NULL UNIQUE"
+)
+tryCreateTableIfNotExists(conn, "subind", specs)
+logger.info("Created SUBIND table")
+########################################
+# Create CATEGORY table
+########################################
+#q_str <- "CREATE TABLE IF NOT EXISTS category (category_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, category_name TEXT(50) NOT NULL UNIQUE)"
+#trySendQuery(conn, q_str)
+specs <- c("category_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE", 
+           "category_name TEXT(50) NOT NULL UNIQUE"
+)
+tryCreateTableIfNotExists(conn, "category", specs)
+logger.info("Created CATEGORY table")
+
+#q_str <- "INSERT OR REPLACE INTO category (category_name) VALUES ('company fundamental'), ('price'), ('company meta'), ('country fundamental')"
+#stopifnot(trySendQuery(conn, q_str))
+tryInsertOrReplace(conn, "category", c("category_name"), data.frame(enQuote(c("company fundamental","price","company meta","country fundamental"))))
+logger.info("Populated CATEGORY table")
+
+########################################
+# Create FREQUENCY table
+########################################
+#q_str <- "CREATE TABLE IF NOT EXISTS frequency (freq VARCHAR(1) PRIMARY KEY NOT NULL UNIQUE, freq_name VARCHAR(20) UNIQUE)"
+#trySendQuery(conn, q_str)
+specs <- c("freq VARCHAR(1) PRIMARY KEY NOT NULL UNIQUE",
+           "freq_name VARCHAR(20) UNIQUE"
+)
+tryCreateTableIfNotExists(conn, "frequency", specs)
+logger.info("Created FREQUENCY table")
+#q_str <- "INSERT OR REPLACE INTO frequency (freq, freq_name) VALUES ('Y','Anuual'),('S','Semiannual'),('Q','Quarterly'),('M','Monthly'),('D','Daily')"
+#stopifnot(trySendQuery(conn, q_str))
+tryInsertOrReplace(conn, "frequency", c("freq", "freq_name"), 
+data.frame(enQuote(c("Y","S","Q","M","D")),enQuote(c("Anuual","Semiannual","Quarterly","Monthly","Daily"))) )
+logger.info("Populated FREQUENCY table")
+
+########################################
+# Create FQL table
+########################################
+#q_str <- "CREATE TABLE IF NOT EXISTS fql (fql VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE, description TEXT(100), unit FLOAT, freq CHAR(1), note TEXT(200), category_id INTEGER, FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE NO ACTION ON UPDATE CASCADE, FOREIGN KEY(freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE )"
+#stopifnot(!trySendQuery(conn, q_str))
+specs <- c("fql VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE", 
+           "syntax TEXT(200)",
+           "description TEXT(100)", 
+           "unit FLOAT", 
+           "report_freq CHAR(1)", 
+           "note TEXT(200)", 
+           "category_id INTEGER", 
+           "FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
+           "FOREIGN KEY(report_freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE"
+)
+tryCreateTableIfNotExists(conn, "fql", specs)
+logger.info("Created FQL table")
+
+########################################
 # FQL map
 ########################################
 stopifnot( exists("FQL_MAP", envir=config) )
 fql_map_filename <- get("FQL_MAP", envir=config)
 stopifnot(file.exists(fql_map_filename))
 fql_map <- read.csv(fql_map_filename)
-rownames(fql_map) <- fql_map$item
+rownames(fql_map) <- fql_map$fql
+for( i in seq(1, nrow(fql_map) )){
+    r <- fql_map[i,]
+    fql <- r$fql
+    syntax <- r$syntax
+    description <- r$description
+    unit <- r$unit
+    report_freq <- r$report_freq
+    category <- r$category
+    note <- r$note
+    ret <- trySelect(conn, "category", c("category_id"), paste("category_name", enQuote(category), sep="="))
+    category_id <- ret$category_id
+    tryInsertOrReplace(conn, "fql", c("fql","syntax","description","unit","report_freq","note","category_id"),
+              data.frame(c(enQuote(fql)),
+                         c(enQuote2(syntax)),
+                         c(enQuote(description)),
+                         c(unit),
+                         c(enQuote(report_freq)),
+                         c(enQuote(category)),
+                         c(enQuote(note))
+                         )
+              )
 
-tryExtract <- function(param, d1, d2, freq, curr) {
-    formula <- fql_map[param, ]$fql
+}
+
+tryExtract <- function(param, id, d1, d2, freq, curr) {
+    #browser()
+    formula <- fql_map[param, ]$syntax
+    stopifnot(!is.empty(formula))
+    formula <- gsub("<ID>", id, formula)
     formula <- gsub("<d1>",d1,formula)
     formula <- gsub("<d2>",d2,formula)
     formula <- gsub("<freq>",freq,formula)
     formula <- gsub("<curr>",curr,formula)
-    formula <- gsub("<ID>", id, formula)
-    print(formula)
+    logger.info(formula)
     ret <- eval(parse(text=formula))
+    if(is.null(ret)) return(data.frame())
     return(ret)
 }
 
-
-########################################
-# Create Country Table
-########################################
-q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEST(50), exchange TEXT(50), curr_iso VARCHAR(3), curr TEXT(100), market VARCHAR(25))"
-stopifnot(!is.null(trySendQuery(conn, q_str)))
-logger.info("Created COUNTRY table")
-########################################
-# Create COMPANY table
-########################################
-q_str <- "CREATE TABLE IF NOT EXISTS company (factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE, company_name TEXT(100), country_id INTEGER, sector_id,indgrp_id,industry_id,subind_id,FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(sector_id) REFERENCES sector(sector_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(indgrp_id) REFERENCES indgrp(indgrp_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(industry_id) REFERENCES industry(industry_id) ON DELETE NO ACTION ON UPDATE CASCADE,FOREIGN KEY(subind_id) REFERENCES subind(subind_id) ON DELETE NO ACTION ON UPDATE CASCADE)"
-stopifnot(!is.null(trySendQuery(conn, q_str)))
-logger.info("Created COMPANY table")
-########################################
-# Create (industrial) SECTOR table
-########################################
-q_str <- "CREATE TABLE IF NOT EXISTS sector (sector_id INTEGER PRIMARY KEY NOT NULL UNIQUE, sector_name TEXT(100) NOT NULL UNIQUE)"
-stopifnot(!is.null(trySendQuery(conn, q_str)))
-logger.info("Created SECTOR table")
-########################################
-# Create INDGRP table
-########################################
-q_str <- "CREATE TABLE IF NOT EXISTS indgrp (indgrp_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, indgrp_name TEXT(100) NOT NULL UNIQUE)"
-stopifnot(!is.null(trySendQuery(conn, q_str)))
-logger.info("Created INDGRP table")
-########################################
-# Create INDUSTRY table
-########################################
-q_str <- "CREATE TABLE IF NOT EXISTS industry (industry_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, industry_name TEXT(100) NOT NULL UNIQUE)"
-stopifnot(!is.null(trySendQuery(conn, q_str)))
-logger.info("Created INDUSTRY table")
-########################################
-# Create SUBIND table
-########################################
-q_str <- "CREATE TABLE IF NOT EXISTS subind (subind_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, subind_name TEXT(100) NOT NULL UNIQUE)"
-stopifnot(!is.null(trySendQuery(conn, q_str)))
-logger.info("Created SUBIND table")
-########################################
-# Create CATEGORY table
-########################################
-q_str <- "CREATE TABLE IF NOT EXISTS category (category_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, category_name TEXT(50) NOT NULL UNIQUE)"
-trySendQuery(conn, q_str)
-logger.info("Created CATEGORY table")
-q_str <- "INSERT OR REPLACE INTO category (category_name) VALUES ('company fundamental'), ('price'), ('company meta'), ('country fundamental')"
-stopifnot(!is.null(trySendQuery(conn, q_str)))
-########################################
-# Create FREQUENCY table
-########################################
-q_str <- "CREATE TABLE IF NOT EXISTS frequency (freq VARCHAR(1) PRIMARY KEY NOT NULL UNIQUE, freq_name VARCHAR(20) UNIQUE)"
-trySendQuery(conn, q_str)
-logger.info("Created CATEGORY table")
-q_str <- "INSERT OR REPLACE INTO frequency (freq, freq_name) VALUES ('Y','Anuual'),('S','Semiannual'),('Q','Quarterly'),('M','Monthly'),('D','Daily')"
-stopifnot(!is.null(trySendQuery(conn, q_str)))
-########################################
-# Create FACTLET table
-########################################
-q_str <- "CREATE TABLE IF NOT EXISTS factlet (factlet VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE, description TEXT(100), unit FLOAT, freq CHAR(1), note TEXT(200), category_id INTEGER, FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE NO ACTION ON UPDATE CASCADE, FOREIGN KEY(freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE )"
-stopifnot(!is.null(trySendQuery(conn, q_str)))
-logger.info("Created FACTLET table")
 ########################################
 # Company meta data
 ########################################
@@ -379,7 +474,7 @@ for( fsid in universe ) {
             indgrp <- tryGetQuery(conn, q_str, MAX_TRIALS)
         }
     } 
-    iindustry_id <- "NULL"
+    industry_id <- "NULL"
     if( nrow(industry) > 0 && !is.null(industry$industry_id) ){
         industry_id <- industry$industry_id
     }
@@ -426,7 +521,7 @@ for( fsid in universe ) {
         q_str <- paste("CREATE TABLE IF NOT EXISTS \"", tablename, "\" (date INTEGER PRIMARY KEY NOT NULL UNIQUE, usd, local)", sep="")
         logger.debug(q_str)
         trySendQuery(conn, q_str, MAX_TRIALS)
-        logger.info(paste("Created table:", tablename))
+        logger.info(paste("Created tseries table:", tablename))
 
         controls <- get(paste(fs_prefix, param, sep=""), envir=config)
         curr_list <- c(default_currency)
@@ -454,6 +549,7 @@ for( fsid in universe ) {
         if( all("Y" %in% controls) ) {
             freq_list <- cbind(freq_list, "Y")
         }
+        #browser()
         for( freq in freq_list ){
             master_data <- NULL
             for( curr in curr_list ){
@@ -461,13 +557,13 @@ for( fsid in universe ) {
                 data <- NULL
 
                 tryCatch({
-                    data <- tryExtract(param, fs.t0, fs.t1, freq, curr)
+                    data <- tryExtract(param, fsid, fs.t0, fs.t1, freq, curr)
                 }, error=function(msg){
                     logger.error(msg)
                     next
                 })
 
-                if( nrow(data) < 1 ){
+                if( is.empty(data) ){
                     logger.warn("Empty data.  Skipping...")
                     next
                 }
@@ -495,7 +591,7 @@ for( fsid in universe ) {
                 return(TRUE)
             }, val_list)
             
-            if( length(val_list) < 1 ){
+            if( is.empty(val_list) ){
                 logger.debug("No non-NA data")
                 next   
             }

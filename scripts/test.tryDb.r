@@ -20,8 +20,8 @@ expected <- data.frame(c(2,3), c(20,30))
 ret <- trySelect(conn, "dummy", c("id","val"), "val>=20")
 assert.equal(ret, expected)
 
-tryInsert(conn, "dummy", c("id","val"), data.frame(c(4), c(40)))
+tryInsert(conn, "dummy", c("id","val"), data.frame(c(4,5), c(40,50)))
 
-tryInsertOrUpdate(conn, "dummy", "id", c("id","val"), data.frame(c(4,5), c(400,50)))
+tryInsertOrUpdate(conn, "dummy", "id", c("id","val"), data.frame(c(4,5,6), c(400,50,60)))
 
 dbDisconnect(conn)

@@ -23,7 +23,7 @@ tryCreateTable <- function(conn, tablename, column_specs, max_failures=0){
     q_str <- paste("CREATE TABLE", enQuote(tablename), enParen(paste(column_specs,collapse=",")))
     return(trySendQuery(conn, q_str, max_failures))
 }
-tryCreateIfNotExistsTable <- function(conn, tablename, column_specs, max_failures=0){
+tryCreateTableIfNotExists <- function(conn, tablename, column_specs, max_failures=0){
     q_str <- paste("CREATE TABLE IF NOT EXISTS", enQuote(tablename), enParen(paste(column_specs, collapse=",")))
     return(trySendQuery(conn, q_str, max_failures))
 }
@@ -32,20 +32,20 @@ tryDrop <- function(conn, tablename, max_failures=0){
     return(trySendQuery(conn, q_str, max_failures))
 }
 tryInsert <- function(conn, tablename, columns, values, max_failures=0){
-    q_str <- paste("INSERT INTO", enQuote(tablename), enParen(paste(columns, collapse=",")), "VALUES", 
+    q_str <- paste("INSERT INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
                    paste(apply(values, 1, FUN=function(row){ enParen(paste(row, collapse=",")) }), collapse=","))
     return(trySendQuery(conn, q_str, max_failures))
 }
 tryInsertOrReplace <- function(conn, tablename, columns, values, max_failures=0){
-    q_str <- paste("INSERT OR REPLACE INTO", enQuote(tablename), enParen(paste(columns, collapse=",")), "VALUES", 
-                   paste(apply(values, 1, FUN=function(row){ enParen(paste(row, collapse=",")) })), collapse=",")
+    q_str <- paste("INSERT OR REPLACE INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
+                   paste(apply(values, 1, FUN=function(row){ enParen(paste(row, collapse=",")) }), collapse=","))
     return(trySendQuery(conn, q_str, max_failures))
 }
 tryUpdate <- function(conn, tablename, keyname, keyval, columns, values, max_failures=0){
     assert.equal(length(columns), length(values))
     to_exclude <- which(columns==keyname)
-    pairs <- paste(columns,"=",values,sep="")
-    q_str <- paste("UPDATE", enQuote(tablename), "SET", paste(pairs,collapse=","), "WHERE", keyname, "=", keyval)
+    pairs <- paste(enQuote(columns),"=",values,sep="")
+    q_str <- paste("UPDATE", enQuote(tablename), "SET", paste(pairs,collapse=","), "WHERE", enQuote(keyname), "=", keyval)
     return(trySendQuery(conn, q_str, max_failures))
 }
 tryInsertOrUpdate <- function(conn, tablename, keyname, columns, values, max_failures=0) {
