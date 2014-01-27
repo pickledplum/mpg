@@ -22,13 +22,12 @@ tryCatch({
 )
 MAX_TRIALS <- 5
 
-db <- "D:/home/honda/sqlite-db/mini.sqlite"
-
 config_file <- "/home/honda/mpg/dummy/createdb.conf"
 config <- read_config(config_file) # returns an environment
-wkdir <- get("WORKING_DIR", envir=config)
 
-timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
+db <- get("DB", envir=config)
+
+started <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 logfile <- file.path(wkdir, paste("dummy", ".log",sep=""))
 logger.init(level=logger.INFO,
             do_stdout=TRUE,
@@ -298,7 +297,7 @@ tryExtract <- function(param, id, d1, d2, freq, curr) {
 # industry
 # sub-industry
 #
-fs_company_meta_list <- c("FG_COMPANY_NAME",
+fs_company_info_list <- c("FG_COMPANY_NAME",
   "P_DCOUNTRY",
   "P_DCOUNTRY(REG)",
   "P_EXCHANGE",
@@ -331,62 +330,60 @@ fs_company_meta_colnames <- c("id",
 ########################################
 for( fsid in universe ) {
     # Company meta data
-    company <- FF.ExtractDataSnapshot(fsid, paste(fs_company_meta_list, collapse=","))
-    colnames(company) <- fs_company_meta_colnames
-    
-    # register the country if not registered
-    q_str <- paste("SELECT country_id FROM country WHERE country='", company$country, "'",sep="")
-    logger.debug(q_str)  
-    country <- tryGetQuery(conn, q_str, MAX_TRIALS) 
+    company <- FF.ExtractDataSnapshot(fsid, paste(fs_company_info_list, collapse=","))
+    colnames(company) <- fs_company_meta_colnames 
+    country <- trySelect(conn, "country", c("country_id"), paste("country='",company$country, "'",sep=""), MAX_TRIALS)
     if( nrow(country) > 0 ){
         logger.debug(paste("Found the entry in the country table:", company$country))
     } else {
-        value_list <- c(company$country, 
-                        company$region, 
-                        company$exchange,
-                        company$curr,
-                        company$curr_code,
-                        market
-                        )       
-        q_str <- paste("INSERT OR REPLACE INTO country (country,region,exchange,curr,curr_iso,market) VALUES",
-                       "(",
-                       paste("\"", value_list, "\"", sep="", collapse=","),
-                       ")",
-                       sep="")
-        logger.debug(q_str)
-        trySendQuery(conn, q_str, MAX_TRIALS)
-        logger.info(paste("Registered to the country table:", company$country))
+        tryInsertOrReplace(conn, 
+                           "country", 
+                           c("country", "region", "exchange", "curr", "curr_iso", "market"), 
+                           data.frame(c(enQuote(company$country)),
+                                      c(enQuote(company$region)),
+                                      c(enQuote(company$exchange)),
+                                      c(enQuote(company$curr)),
+                                      c(enQuote(company$curr_code)),
+                                      c(enQuote(market))
+                           ),
+                           MAX_TRIALS)
         
-        q_str <- paste("SELECT country_id FROM country WHERE country='", company$country, "'",sep="")
-        logger.debug(q_str)   
-        country <- tryGetQuery(conn, q_str, MAX_TRIALS)
+        logger.info(paste("Registered to the country table:", company$country))
+
+        country <- trySelect(conn, "country", c("country_id"), paste("country='",company$country,"'",sep=""))
     }
     country_id <- "NULL"
     if( nrow(country) > 0 && !is.null(country$country_id) ){
         country_id <- country$country_id
     }
-    
-    
-    val_list <- c(enQuote(company$id), 
-                  enQuote(company$name), 
-                  country_id,
-                  enQuote(company$sector),
-                  enQuote(company$indgrp),
-                  enQuote(company$industry),
-                  enQuote(company$subind))
-    val_liststr <- paste(val_list, collapse=",")
-    q_str <- paste("INSERT OR REPLACE INTO company (factset_id,company_name,country_id,sector,indgrp,industry,subind) VALUES (", val_liststr, ")", sep=""); 
-    logger.debug(q_str)
-    trySendQuery(conn, q_str, MAX_TRIALS)
+    tryInsertOrReplace(conn, "company", 
+                       c("factset_id",
+                         "company_name",
+                         "country_id",
+                         "sector",
+                         "indgrp",
+                         "industry",
+                         "subind"),
+                       data.frame(c(enQuote(company$id)),
+                                  c(enQuote(company$name)),
+                                  c(country_id),
+                                  c(enQuote(company$sector)),
+                                  c(enQuote(company$indgrp)),
+                                  c(enQuote(company$industry)),
+                                  c(enQuote(company$subind))
+                       )
+    )
     logger.info(paste("Registered to the company table:", val_liststr))
     
     # register company
     for( param in param_list ){
         tablename <- paste(param, fsid, sep="-")
-        q_str <- paste("CREATE TABLE IF NOT EXISTS \"", tablename, "\" (date INTEGER PRIMARY KEY NOT NULL UNIQUE, usd, local)", sep="")
-        logger.debug(q_str)
-        trySendQuery(conn, q_str, MAX_TRIALS)
-        logger.info(paste("Created tseries table:", tablename))
+        specs <- c("date INTEGER PRIMARY KEY NOT NULL UNIQUE", 
+                    "usd FLOAT", 
+                    "local FLOAT"
+        )
+        tryCreateTableIfNotExists(conn, tablename, specs)
+        logger.info(paste("Created tseries table:", tablename, specs))
 
         controls <- get(paste(fs_prefix, param, sep=""), envir=config)
         curr_list <- c(default_currency)
@@ -414,7 +411,6 @@ for( fsid in universe ) {
         if( all("Y" %in% controls) ) {
             freq_list <- cbind(freq_list, "Y")
         }
-        #browser()
         for( freq in freq_list ){
             master_data <- NULL
             for( curr in curr_list ){
@@ -433,45 +429,47 @@ for( fsid in universe ) {
                     next
                 }
                 colnames(data) <- c("id", "date", curr)
-                #browser()
                 if( is.null(master_data) ){
                     master_data <- data
                 } else {
                     master_data <- merge(master_data, data, by=c("id", "date"))
                 }                
             }
-
-            val_list <- apply(master_data, 1, function(row){ 
-                if(!all(is.na(row[3:length(row)])) ){
-                    j <- julian(as.Date(row[2]))
-                    paste("(", j, ",", paste(row[3:length(row)], collapse=","), ")", sep="")
-                } 
+            filter <- vector("logical", nrow(master_data))
+            do_skip <- TRUE
+            for( j in seq(1,nrow(master_data)) ){
+                if( all(is.na(master_data[j,][3:ncol(master_data)]) ) ){
+                    if(do_skip){
+                        filter[j] <- FALSE
+                    } else{
+                        filter[j] <- TRUE
+                    }
+                } else{
+                    #do_skip <- FALSE
+                    filter[j] <- TRUE
+                }
             }
-            )
-
-            val_list <- Filter( function(x) {
-                if( is.null(x) ){
-                    return(FALSE)
-                } 
-                return(TRUE)
-            }, val_list)
-            
-            if( is.empty(val_list) ){
-                logger.debug("No non-NA data")
-                next   
+                    
+            filtered_data <- master_data[filter,]
+            for( j in seq(1, nrow(filtered_data) ) ){
+                julianval <- julian(as.Date(unlist(filtered_data[j,][2])))
+                rownames(filtered_data)[j] <- julianval
             }
-
             for( begin in seq(1, length(val_list), 100) ){
-                end <- min(length(val_list), begin+100-1)
-                val_list[begin:end]
-
-                val_liststr <- paste(val_list[begin:end], collapse=",")
-                
-                q_str <- paste("INSERT OR REPLACE INTO \"", 
-                               tablename, 
-                               "\" (date,", paste(curr_list,collapse=","), ") VALUES ", val_liststr, "", sep="")
-                logger.debug(q_str)
-                trySendQuery(conn, q_str, MAX_TRIALS )
+                end <- min(nrow(filtered_data), begin+100-1)
+                values
+                if( ncol(filtered_data) > 3 ){
+                    values <- cbind(rownames(filtered_data[begin:end,]),
+                                    filtered_data[begin:end,][c(3,4)])
+                } else {
+                    values <- cbind(rownames(filtered_data[begin:end,]),
+                                    filtered_data[begin:end,][3])
+                }
+                tryInsertOrReplace(conn, 
+                                   tablename, 
+                                   c("date", curr_list), 
+                                   values
+                )
             }
 
         }

@@ -33,12 +33,12 @@ tryDrop <- function(conn, tablename, max_failures=0){
 }
 tryInsert <- function(conn, tablename, columns, values, max_failures=0){
     q_str <- paste("INSERT INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
-                   paste(apply(values, 1, FUN=function(row){ enParen(paste(row, collapse=",")) }), collapse=","))
+                   paste(apply(values, 1, FUN=function(record){ enParen(paste(record, collapse=",")) }), collapse=","))
     return(trySendQuery(conn, q_str, max_failures))
 }
 tryInsertOrReplace <- function(conn, tablename, columns, values, max_failures=0){
     q_str <- paste("INSERT OR REPLACE INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
-                   paste(apply(values, 1, FUN=function(row){ enParen(paste(row, collapse=",")) }), collapse=","))
+                   paste(apply(values, 1, FUN=function(record){ enParen(paste(record, collapse=",")) }), collapse=","))
     return(trySendQuery(conn, q_str, max_failures))
 }
 tryUpdate <- function(conn, tablename, keyname, keyval, columns, values, max_failures=0){
