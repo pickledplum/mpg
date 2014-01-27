@@ -66,7 +66,7 @@ tryInsertOrUpdate <- function(conn, tablename, keyname, columns, values, max_fai
 }
 
 trySendQuery <- function(conn, q_str, max_failures=0){
-    print(q_str)
+    logger.debug(q_str)
     for( nfailure in seq(0, max_failures)) {
         tryCatch({
             dbSendQuery(conn, q_str)
@@ -84,7 +84,7 @@ trySendQuery <- function(conn, q_str, max_failures=0){
     return(TRUE)
 }
 tryGetQuery <- function(conn, q_str, max_failures=0){
-    print(q_str)
+    logger.debug(q_str)
     ret <- NULL
     for( nfailure in seq(0, max_failures)) {
         tryCatch({
