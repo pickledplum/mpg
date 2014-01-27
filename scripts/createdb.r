@@ -11,6 +11,7 @@ tryCatch({
     source("assert.r")
     source("tryExtract.r")
     source("is.empty.r")
+    source("drop_tables.r")
     
 }, warning=function(msg){
     print(msg)
@@ -22,21 +23,30 @@ tryCatch({
 )
 MAX_TRIALS <- 5
 
+
 config_file <- "/home/honda/mpg/dummy/createdb.conf"
 config <- read_config(config_file) # returns an environment
 
 db <- get("DB", envir=config)
+stopifnot( exists("WORKING_DIR", envir=config) )
+wkdir <- get("WORKING_DIR", mode="character", envir=config) 
+if( !file.exists(wkdir) ){
+    logger.warn(paste("Directory does not exist.  Creating...:", wkdir))
+    dir.create(wkdir)
+}
+stopifnot( file.exists(wkdir) )
 
-started <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 logfile <- file.path(wkdir, paste("dummy", ".log",sep=""))
 logger.init(level=logger.INFO,
             do_stdout=TRUE,
             logfile=logfile)
 
 print(paste("Log file:", logfile))
+logger.info("Started...")
 
 conn <<- dbConnect( SQLite(), db )
 logger.info(paste("Opened SQLite database:", db))
+drop_tables(conn)
 # on.exit( function(conn) {
 # 
 #     dbDisconnect(conn)
@@ -66,13 +76,7 @@ t0 <- ""
 t1 <- ""
 default_currency <- ""
 
-stopifnot( exists("WORKING_DIR", envir=config) )
-wkdir <- get("WORKING_DIR", mode="character", envir=config) 
-if( !file.exists(wkdir) ){
-    logger.warn(paste("Directory does not exist.  Creating...:", wkdir))
-    dir.create(wkdir)
-}
-stopifnot( file.exists(wkdir) )
+
 
 stopifnot( exists("OUTPUT_PREFIX", envir=config) )
 prefix <- get("OUTPUT_PREFIX", mode="character", envir=config) # "dummy"
@@ -91,8 +95,9 @@ stopifnot(grepl("[[:digit:]]+{4}-[[:digit:]]+{2}-[[:digit:]]+{2}", t1))
 fs.t1 <- gsub("-", "", t1)
 
 stopifnot( exists("DEFAULT_CURRENCY", envir=config) )
-default_currency <- get("DEFAULT_CURRENCY", mode="character", envir=config) # USD
-stopifnot( toupper(default_currency) %in% c("USD","LOCAL") )
+default_currency <- get("DEFAULT_CURRENCY", mode="character", envir=config) 
+default_currency <- tolower(default_currency)
+stopifnot( default_currency %in% c("usd","local") )
 
 stopifnot( exists("MARKET", envir=config) )
 market <- get("MARKET", mode="character", envir=config)
@@ -160,7 +165,7 @@ specs <- c("country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE",
            "curr_iso VARCHAR(3)", 
            "curr TEXT(100)", 
            "market VARCHAR(25)" )
-tryCreateTableIfNotExists(conn, "country", specs)
+tryCreateTable(conn, "country", specs)
 logger.info("Created COUNTRY table")
 ########################################
 # Create COMPANY table
@@ -177,7 +182,7 @@ specs <- c("factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE",
            "FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE"
 )
 
-tryCreateTableIfNotExists(conn, "company", specs)
+tryCreateTable(conn, "company", specs)
 logger.info("Created COMPANY table")
 
 ########################################
@@ -188,7 +193,7 @@ logger.info("Created COMPANY table")
 specs <- c("category_id VARCHAR(50) PRIMARY KEY NOT NULL UNIQUE", 
            "category_descript TEXT(50) NOT NULL UNIQUE"
 )
-tryCreateTableIfNotExists(conn, "category", specs)
+tryCreateTable(conn, "category", specs)
 logger.info("Created CATEGORY table")
 
 #q_str <- "INSERT OR REPLACE INTO category (category_id, category_descript) VALUES ('company_fund', 'Company fundamental'), ('price', 'Price'), ('company_info', 'Company info'), ('country_fund', 'Country fundamental')"
@@ -206,7 +211,7 @@ logger.info("Populated CATEGORY table")
 specs <- c("freq VARCHAR(1) PRIMARY KEY NOT NULL UNIQUE",
            "freq_name VARCHAR(20) UNIQUE"
 )
-tryCreateTableIfNotExists(conn, "frequency", specs)
+tryCreateTable(conn, "frequency", specs)
 logger.info("Created FREQUENCY table")
 #q_str <- "INSERT OR REPLACE INTO frequency (freq, freq_name) VALUES ('Y','Anuual'),('S','Semiannual'),('Q','Quarterly'),('M','Monthly'),('D','Daily')"
 #stopifnot(trySendQuery(conn, q_str))
@@ -229,7 +234,7 @@ specs <- c("fql VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE",
            "FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
            "FOREIGN KEY(report_freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE"
 )
-tryCreateTableIfNotExists(conn, "fql", specs)
+tryCreateTable(conn, "fql", specs)
 logger.info("Created FQL table")
 
 ########################################
@@ -280,23 +285,9 @@ tryExtract <- function(param, id, d1, d2, freq, curr) {
 }
 
 ########################################
-# Company meta data
+# Company basics 
 ########################################
-# Company basics
-#
-# company name
-# country of operation
-# region of operation
-# exchange
-# currency
-# currency 3 letter code
-# isin
-# SEDOL
-# sector
-# industry group
-# industry
-# sub-industry
-#
+
 fs_company_info_list <- c("FG_COMPANY_NAME",
   "P_DCOUNTRY",
   "P_DCOUNTRY(REG)",
@@ -324,7 +315,18 @@ fs_company_meta_colnames <- c("id",
   "indgrp",
   "industry",
   "subind")
-
+########################################
+########################################
+specs <- c("tablename VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE",
+           "factset_id VARCHAR(20) NOT NULL",
+           "fql VARCHAR(20) NOT NULL",
+           "usd INTEGER DEFAULT 0 NOT NULL",
+           "local INTEGER DEFAULT 0 NOT NULL",
+           "first_date INTEGER",
+           "last_date INTEGER",
+           "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
+           "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE NO ACTION ON UPDATE CASCADE")
+tryCreateTable(conn, "catalog", specs)
 ########################################
 # Create param-company tables
 ########################################
@@ -371,9 +373,10 @@ for( fsid in universe ) {
                                   c(enQuote(company$indgrp)),
                                   c(enQuote(company$industry)),
                                   c(enQuote(company$subind))
-                       )
+                       ),
+                       MAX_TRIALS
     )
-    logger.info(paste("Registered to the company table:", val_liststr))
+    logger.info(paste("Registered to the company table:", company$id, company$name))
     
     # register company
     for( param in param_list ){
@@ -382,7 +385,7 @@ for( fsid in universe ) {
                     "usd FLOAT", 
                     "local FLOAT"
         )
-        tryCreateTableIfNotExists(conn, tablename, specs)
+        tryCreateTable(conn, tablename, specs, MAX_TRIALS)
         logger.info(paste("Created tseries table:", tablename, specs))
 
         controls <- get(paste(fs_prefix, param, sep=""), envir=config)
@@ -390,12 +393,12 @@ for( fsid in universe ) {
         freq_list <- c()
         
         if( all("LOCAL" %in% controls) ) {
-            if( default_currency != "LOCAL" ){
+            if( default_currency != "local" ){
                 curr_list <- cbind(curr_list, "local")
             }
         }
         if( all("USD" %in% controls) ){
-            if( default_currency != "USD" ){
+            if( default_currency != "usd" ){
                 curr_list <- cbind(curr_list, "usd")
             }
         }
@@ -428,8 +431,9 @@ for( fsid in universe ) {
                     logger.warn("Empty data.  Skipping...")
                     next
                 }
+                
                 colnames(data) <- c("id", "date", curr)
-                if( is.null(master_data) ){
+                if( is.empty(master_data) ){
                     master_data <- data
                 } else {
                     master_data <- merge(master_data, data, by=c("id", "date"))
@@ -451,30 +455,45 @@ for( fsid in universe ) {
             }
                     
             filtered_data <- master_data[filter,]
-            for( j in seq(1, nrow(filtered_data) ) ){
-                julianval <- julian(as.Date(unlist(filtered_data[j,][2])))
-                rownames(filtered_data)[j] <- julianval
+            if( nrow(filtered_data) < 1 ){
+                logger.warn(paste("No data from", t0, "to", t1, ":", fsid, param))
+                next
             }
-            for( begin in seq(1, length(val_list), 100) ){
+            for( begin in seq(1, nrow(filtered_data), 100) ){
                 end <- min(nrow(filtered_data), begin+100-1)
-                values
+                values <- NULL
                 if( ncol(filtered_data) > 3 ){
-                    values <- cbind(rownames(filtered_data[begin:end,]),
-                                    filtered_data[begin:end,][c(3,4)])
+                    values <- cbind(julian(as.Date(filtered_data[begin:end,][[2]])),
+                                    filtered_data[begin:end,][[c(3,4)]])
                 } else {
-                    values <- cbind(rownames(filtered_data[begin:end,]),
-                                    filtered_data[begin:end,][3])
+                    values <- cbind(julian(as.Date(filtered_data[begin:end,][[2]])),
+                                    filtered_data[begin:end,][[3]])
                 }
                 tryInsertOrReplace(conn, 
                                    tablename, 
                                    c("date", curr_list), 
-                                   values
+                                   values,
+                                   MAX_TRIALS
                 )
             }
-
+            # register to catalog
+            columns <- c("tablename","factset_id","fql","usd","local","first_date","last_date")
+            values <- data.frame(enQuote(tablename),
+                                 enQuote(c(fsid)),
+                                 enQuote(c(param)),
+                                 c( ifelse( "usd" %in% curr_list, 1, 0) ),
+                                 c( ifelse( "local" %in% curr_list, 1, 0) ),
+                                 rownames(filtered_data)[1],
+                                 rownames(filtered_data)[nrow(filtered_data)]
+            )
+            tryInsert(conn, "catalog", columns, values, MAX_TRIALS)
         }
     }
 }
+
+finished <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
+print(paste("started, finished:", started, "-", finished))
+print(paste("Log file:", logfile))
 
 dbCommit(conn)
 dbDisconnect(conn)
