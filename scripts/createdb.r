@@ -10,7 +10,7 @@ tryCatch({
     source("tryDb.r")
     source("assert.r")
     source("tryExtract.r")
-    source("is.emptry.r")
+    source("is.empty.r")
     
 }, warning=function(msg){
     print(msg)
@@ -30,7 +30,7 @@ wkdir <- get("WORKING_DIR", envir=config)
 
 timestamp <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 logfile <- file.path(wkdir, paste("dummy", ".log",sep=""))
-logger.init(level=logger.DEBUG,
+logger.init(level=logger.INFO,
             do_stdout=TRUE,
             logfile=logfile)
 
@@ -227,7 +227,7 @@ logger.info("Created SUBIND table")
 ########################################
 # Create CATEGORY table
 ########################################
-#q_str <- "CREATE TABLE IF NOT EXISTS category (category_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, category_name TEXT(50) NOT NULL UNIQUE)"
+#q_str <- "CREATE TABLE IF NOT EXISTS category (category_id VARCHAR(30) PRIMARY KEY NOT NULL UNIQUE, category_descrip TEXT(50) NOT NULL UNIQUE)"
 #trySendQuery(conn, q_str)
 specs <- c("category_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE", 
            "category_name TEXT(50) NOT NULL UNIQUE"
@@ -235,9 +235,11 @@ specs <- c("category_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE",
 tryCreateTableIfNotExists(conn, "category", specs)
 logger.info("Created CATEGORY table")
 
-#q_str <- "INSERT OR REPLACE INTO category (category_name) VALUES ('company fundamental'), ('price'), ('company meta'), ('country fundamental')"
+#q_str <- "INSERT OR REPLACE INTO category (category_id, category_descript) VALUES ('company_fund', 'Company fundamental'), ('price', 'Price'), ('company_info', 'Company info'), ('country_fund', 'Country fundamental')"
 #stopifnot(trySendQuery(conn, q_str))
-tryInsertOrReplace(conn, "category", c("category_name"), data.frame(enQuote(c("company fundamental","price","company meta","country fundamental"))))
+tryInsertOrReplace(conn, "category", c("category_id", "category_descript"), 
+                   data.frame(enQuote(c("company_fund", "price", "company_info", "country_fund"), 
+                                      c("Company fundamental","Price","Company info","Country fundamental"))))
 logger.info("Populated CATEGORY table")
 
 ########################################
