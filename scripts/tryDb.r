@@ -16,7 +16,12 @@ enParen <- function( items ){
 # conditions: vector of SQL WHERE conditions
 # outwhat: vector of items to be returned
 trySelect <- function(conn, tablename, columns, conditions, max_failures=0){
-    q_str <- paste("SELECT", paste(columns, collapse=","), "FROM", enQuote(tablename), "WHERE", conditions)
+    if( is.empty(conditions) ){
+        q_str <- paste("SELECT", paste(columns, collapse=","), "FROM", enQuote(tablename))
+        
+    } else{
+        q_str <- paste("SELECT", paste(columns, collapse=","), "FROM", enQuote(tablename), "WHERE", conditions)
+    }
     return(tryGetQuery(conn, q_str, max_failures))
 }
 tryCreateTable <- function(conn, tablename, column_specs, max_failures=0){

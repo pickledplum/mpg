@@ -23,6 +23,7 @@ tryCatch({
 )
 MAX_TRIALS <- 5
 
+started <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 
 config_file <- "/home/honda/mpg/dummy/createdb.conf"
 config <- read_config(config_file) # returns an environment
@@ -47,13 +48,6 @@ logger.info("Started...")
 conn <<- dbConnect( SQLite(), db )
 logger.info(paste("Opened SQLite database:", db))
 drop_tables(conn)
-# on.exit( function(conn) {
-# 
-#     dbDisconnect(conn)
-#     logger.info("Closed db")
-#     logger.info("Good bye!")
-#     logger.close()
-# })
 
 ########################################
 # Configure FS
@@ -317,13 +311,13 @@ fs_company_meta_colnames <- c("id",
   "subind")
 ########################################
 ########################################
-specs <- c("tablename VARCHAR(20) NOT NULL UNIQUE",
+specs <- c("tablename VARCHAR(41) NOT NULL UNIQUE",
            "factset_id VARCHAR(20) NOT NULL",
            "fql VARCHAR(20) NOT NULL",
            "usd INTEGER DEFAULT 0 NOT NULL",
            "local INTEGER DEFAULT 0 NOT NULL",
            "earliest INTEGER",
-           "lastest INTEGER",
+           "latest INTEGER",
            "PRIMARY KEY(factset_id, fql)",
            "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
            "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE NO ACTION ON UPDATE CASCADE")
@@ -482,7 +476,7 @@ for( fsid in universe ) {
                 )
             }
             # register to catalog
-            columns <- c("tablename","factset_id","fql","usd","local","earliest","lastest")
+            columns <- c("tablename","factset_id","fql","usd","local","earliest","latest")
             values <- data.frame(enQuote(tablename),
                                  enQuote(c(fsid)),
                                  enQuote(c(param)),
