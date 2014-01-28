@@ -31,16 +31,19 @@ tryDrop <- function(conn, tablename, max_failures=0){
     q_str <- paste("DROP TABLE IF EXISTS", tablename)
     return(trySendQuery(conn, q_str, max_failures))
 }
+# value: data.frame, each frame contains the list of values for a variable.
 tryInsert <- function(conn, tablename, columns, values, max_failures=0){
     q_str <- paste("INSERT INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
                    paste(apply(values, 1, FUN=function(record){ enParen(paste(record, collapse=",")) }), collapse=","))
     return(trySendQuery(conn, q_str, max_failures))
 }
+# value: data.frame, each frame contains the list of values for a variable.
 tryInsertOrReplace <- function(conn, tablename, columns, values, max_failures=0){
     q_str <- paste("INSERT OR REPLACE INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
                    paste(apply(values, 1, FUN=function(record){ enParen(paste(record, collapse=",")) }), collapse=","))
     return(trySendQuery(conn, q_str, max_failures))
 }
+# value: data.frame, each frame contains the list of values for a variable.
 tryUpdate <- function(conn, tablename, keyname, keyval, columns, values, max_failures=0){
     assert.equal(length(columns), length(values))
     to_exclude <- which(columns==keyname)
@@ -48,6 +51,7 @@ tryUpdate <- function(conn, tablename, keyname, keyval, columns, values, max_fai
     q_str <- paste("UPDATE", enQuote(tablename), "SET", paste(pairs,collapse=","), "WHERE", enQuote(keyname), "=", keyval)
     return(trySendQuery(conn, q_str, max_failures))
 }
+# value: data.frame, each frame contains the list of values for a variable.
 tryInsertOrUpdate <- function(conn, tablename, keyname, columns, values, max_failures=0) {
     to_insert <- values
     keyloc <- which(columns==keyname)

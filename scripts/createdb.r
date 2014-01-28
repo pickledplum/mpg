@@ -156,7 +156,7 @@ logger.info(paste("FACTSET items:", paste(param_list, collapse=",")))
 ########################################
 # Create Country Table
 ########################################
-#q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEST(50), exchange TEXT(50), curr_iso VARCHAR(3), curr TEXT(100), market VARCHAR(25))"
+#q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEXT(50), exchange TEXT(50), curr_iso VARCHAR(3), curr TEXT(100), market VARCHAR(25))"
 #stopifnot(trySendQuery(conn, q_str))
 specs <- c("country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE", 
            "country TEXT(100)", 
@@ -317,16 +317,18 @@ fs_company_meta_colnames <- c("id",
   "subind")
 ########################################
 ########################################
-specs <- c("tablename VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE",
+specs <- c("tablename VARCHAR(20) NOT NULL UNIQUE",
            "factset_id VARCHAR(20) NOT NULL",
            "fql VARCHAR(20) NOT NULL",
            "usd INTEGER DEFAULT 0 NOT NULL",
            "local INTEGER DEFAULT 0 NOT NULL",
-           "first_date INTEGER",
-           "last_date INTEGER",
+           "earliest INTEGER",
+           "lastest INTEGER",
+           "PRIMARY KEY(factset_id, fql)",
            "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
            "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE NO ACTION ON UPDATE CASCADE")
 tryCreateTable(conn, "catalog", specs)
+
 ########################################
 # Create param-company tables
 ########################################
@@ -462,7 +464,6 @@ for( fsid in universe ) {
 
             earliest <- julian(as.Date(filtered_data[1,2]))
             latest <- julian(as.Date(filtered_data[nrow(filtered_data),2]))
-            browser()
             for( begin in seq(1, nrow(filtered_data), 100) ){
                 end <- min(nrow(filtered_data), begin+100-1)
                 values <- NULL
@@ -481,7 +482,7 @@ for( fsid in universe ) {
                 )
             }
             # register to catalog
-            columns <- c("tablename","factset_id","fql","usd","local","first_date","last_date")
+            columns <- c("tablename","factset_id","fql","usd","local","earliest","lastest")
             values <- data.frame(enQuote(tablename),
                                  enQuote(c(fsid)),
                                  enQuote(c(param)),
