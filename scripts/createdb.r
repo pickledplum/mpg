@@ -459,6 +459,10 @@ for( fsid in universe ) {
                 logger.warn(paste("No data from", t0, "to", t1, ":", fsid, param))
                 next
             }
+
+            earliest <- julian(as.Date(filtered_data[1,2]))
+            latest <- julian(as.Date(filtered_data[nrow(filtered_data),2]))
+            browser()
             for( begin in seq(1, nrow(filtered_data), 100) ){
                 end <- min(nrow(filtered_data), begin+100-1)
                 values <- NULL
@@ -483,8 +487,8 @@ for( fsid in universe ) {
                                  enQuote(c(param)),
                                  c( ifelse( "usd" %in% curr_list, 1, 0) ),
                                  c( ifelse( "local" %in% curr_list, 1, 0) ),
-                                 rownames(filtered_data)[1],
-                                 rownames(filtered_data)[nrow(filtered_data)]
+                                 earliest,
+                                 latest
             )
             tryInsert(conn, "catalog", columns, values, MAX_TRIALS)
         }
