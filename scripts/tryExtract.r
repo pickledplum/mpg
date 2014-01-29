@@ -17,10 +17,10 @@ library(FactSetOnDemand)
 # Return a data frame containg the data.  Empty data.frame if error occurs.
 # Try max_trials times before it gives up.  Default is 5.
 #
-tryExtract <- function(fql_map, param, id, d1, d2, freq, curr, max_trials=5) {
+tryExtract <- function(fql_syntax, id, d1, d2, freq, curr, max_trials=5) {
     for( i in seq(1,max_trials) ){
         tryCatch({
-            formula <- fql_map[param, ]$syntax
+            formula <- fql_syntax
             formula <- gsub("<d1>",d1,formula)
             formula <- gsub("<d2>",d2,formula)
             formula <- gsub("<freq>",freq,formula)

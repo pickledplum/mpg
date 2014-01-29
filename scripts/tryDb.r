@@ -2,6 +2,7 @@ library(RSQLite)
 source("logger.r")
 #logger.init(logger.DEBUG, do_stdio=TRUE)
 
+MAX_FAILURES = 5
 
 enQuote <- function( items ){
     return(paste("'", items, "'", sep=""))
@@ -15,7 +16,7 @@ enParen <- function( items ){
 # tablename: tablename name
 # conditions: vector of SQL WHERE conditions
 # outwhat: vector of items to be returned
-trySelect <- function(conn, tablename, columns, conditions, is_distinct=TRUE, max_failures=0){
+trySelect <- function(conn, tablename, columns, conditions, is_distinct=TRUE, max_failures=MAX_FAILURES){
     if( is.empty(conditions) ){
         q_str <- paste("SELECT", ifelse(is_distinct, "DISTINCT", ""), paste(columns, collapse=","), "FROM", enQuote(tablename))
         
@@ -24,37 +25,37 @@ trySelect <- function(conn, tablename, columns, conditions, is_distinct=TRUE, ma
     }
     return(tryGetQuery(conn, q_str, max_failures))
 }
-tryCreateTable <- function(conn, tablename, column_specs, max_failures=0){
+tryCreateTable <- function(conn, tablename, column_specs, max_failures=MAX_FAILURES){
     q_str <- paste("CREATE TABLE", enQuote(tablename), enParen(paste(column_specs,collapse=",")))
     return(trySendQuery(conn, q_str, max_failures))
 }
-tryCreateTableIfNotExists <- function(conn, tablename, column_specs, max_failures=0){
+tryCreateTableIfNotExists <- function(conn, tablename, column_specs, max_failures=MAX_FAILURES){
     q_str <- paste("CREATE TABLE IF NOT EXISTS", enQuote(tablename), enParen(paste(column_specs, collapse=",")))
     return(trySendQuery(conn, q_str, max_failures))
 }
-tryDrop <- function(conn, tablename, max_failures=0){
+tryDrop <- function(conn, tablename, max_failures=MAX_FAILURES){
     q_str <- paste("DROP TABLE IF EXISTS", tablename)
     return(trySendQuery(conn, q_str, max_failures))
 }
-tryInsert <- function(conn, tablename, columns, values, max_failures=0){
+tryInsert <- function(conn, tablename, columns, values, max_failures=MAX_FAILURES){
     q_str <- paste("INSERT INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
                    paste("(", paste(values, collapse=",")), ")", sep="")
     return(trySendQuery(conn, q_str, max_failures))
 }
 # value: data.frame, each frame contains the list of values for a variable.
-tryBulkInsert <- function(conn, tablename, columns, values, max_failures=0){
+tryBulkInsert <- function(conn, tablename, columns, values, max_failures=MAX_FAILURES){
     q_str <- paste("INSERT INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
                    paste(apply(values, 1, FUN=function(record){ enParen(paste(record, collapse=",")) }), collapse=","))
     return(trySendQuery(conn, q_str, max_failures))
 }
 # value: data.frame, each frame contains the list of values for a variable.
-tryBulkInsertOrReplace <- function(conn, tablename, columns, values, max_failures=0){
+tryBulkInsertOrReplace <- function(conn, tablename, columns, values, max_failures=MAX_FAILURES){
     q_str <- paste("INSERT OR REPLACE INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
                    paste(apply(values, 1, FUN=function(record){ enParen(paste(record, collapse=",")) }), collapse=","))
     return(trySendQuery(conn, q_str, max_failures))
 }
 # value: data.frame, each frame contains the list of values for a variable.
-tryBulkUpdate <- function(conn, tablename, keyname, keyval, columns, values, max_failures=0){
+tryBulkUpdate <- function(conn, tablename, keyname, keyval, columns, values, max_failures=MAX_FAILURES){
     assert.equal(length(columns), length(values))
     to_exclude <- which(columns==keyname)
     pairs <- paste(enQuote(columns),"=",values,sep="")
@@ -62,7 +63,7 @@ tryBulkUpdate <- function(conn, tablename, keyname, keyval, columns, values, max
     return(trySendQuery(conn, q_str, max_failures))
 }
 # value: data.frame, each frame contains the list of values for a variable.
-tryBulkInsertOrUpdate <- function(conn, tablename, keyname, columns, values, max_failures=0) {
+tryBulkInsertOrUpdate <- function(conn, tablename, keyname, columns, values, max_failures=MAX_FAILURES) {
     to_insert <- values
     keyloc <- which(columns==keyname)
     n <- nrow(values)
@@ -79,14 +80,14 @@ tryBulkInsertOrUpdate <- function(conn, tablename, keyname, columns, values, max
     }
 }
 
-trySendQuery <- function(conn, q_str, max_failures=0){
+trySendQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
     logger.debug(q_str)
-    for( nfailure in seq(0, max_failures)) {
+    for( nfailure in seq(1, max_failures)) {
         tryCatch({
             dbSendQuery(conn, q_str)
             break
         }, error = function(msg){
-            if( nfailure >= max_failures){
+            if( nfailure > max_failures){
                 logger.error(paste(nfailure, "th failure:", msg, sep=""))
                 stop(msg)
             }
@@ -97,15 +98,15 @@ trySendQuery <- function(conn, q_str, max_failures=0){
     }
     return(TRUE)
 }
-tryGetQuery <- function(conn, q_str, max_failures=0){
+tryGetQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
     logger.debug(q_str)
     ret <- NULL
-    for( nfailure in seq(0, max_failures)) {
+    for( nfailure in seq(1, max_failures)) {
         tryCatch({
             ret <- dbGetQuery(conn, q_str)
             break
         }, error = function(msg){
-            if( nfailure >= max_failures){
+            if( nfailure > max_failures){
                 logger.error(paste(nfailure, "th failure:", msg, sep=""))
                 stop(msg)
             }
