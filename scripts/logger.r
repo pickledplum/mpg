@@ -9,7 +9,7 @@ logger.level <<- logger.INFO
 logger.do_stdout <<- TRUE
 
 logger.init <- function(level, do_stdout=TRUE, logfile=NULL) {
-    logger.logfile <<- file(logfile, open="w",blocking=FALSE)
+    if( !is.null(logfile) ) logger.logfile <<- file(logfile, open="w",blocking=FALSE)
     logger.level <<- level
     logger.do_stdout <<- do_stdout
 }
@@ -52,7 +52,11 @@ logger.logmsg <- function(level, msg){
             flush(logger.logfile)   
         }
         if( logger.do_stdout ){
-            writeLines(msggg, stdout())
+            if( level >= logger.WARN ){
+                writeLines(msggg, stderr())
+            } else{
+                writeLines(msggg, stdout())
+            }
             flush(stdout())
         }
     }
