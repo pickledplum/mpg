@@ -12,6 +12,7 @@ tryCatch({
     source("tryExtract.r")
     source("is.empty.r")
     source("drop_tables.r")
+    source("julianday.r")
     
 }, warning=function(msg){
     print(msg)
@@ -25,7 +26,7 @@ MAX_TRIALS <- 5
 
 started <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 
-config_file <- "/home/honda/mpg/dummy/createdb.conf"
+config_file <- "/home/honda/mpg/dummy/minidb.conf"
 config <- read_config(config_file) # returns an environment
 
 db <- get("DB", envir=config)
@@ -90,12 +91,12 @@ fs.t1 <- gsub("-", "", t1)
 
 stopifnot( exists("DEFAULT_CURRENCY", envir=config) )
 default_currency <- get("DEFAULT_CURRENCY", mode="character", envir=config) 
-default_currency <- tolower(default_currency)
-stopifnot( default_currency %in% c("usd","local") )
+default_currency <- toupper(default_currency)
+stopifnot( default_currency %in% c("USD","LOCAL") )
 
 stopifnot( exists("MARKET", envir=config) )
-market <- get("MARKET", mode="character", envir=config)
-stopifnot( toupper(market) %in% c("MIXED", "EM", "DM", "FM") )
+market <- toupper(get("MARKET", mode="character", envir=config))
+stopifnot( market %in% c("TBD", "EM", "DM", "FM") )
 
 stopifnot( exists("INDEX", envir=config) )
 finance.index <- get("INDEX", mode="character", envir=config)
@@ -192,7 +193,7 @@ logger.info("Created CATEGORY table")
 
 #q_str <- "INSERT OR REPLACE INTO category (category_id, category_descript) VALUES ('company_fund', 'Company fundamental'), ('price', 'Price'), ('company_info', 'Company info'), ('country_fund', 'Country fundamental')"
 #stopifnot(trySendQuery(conn, q_str))
-tryInsertOrReplace(conn, "category", c("category_id", "category_descript"), 
+tryBulkInsertOrReplace(conn, "category", c("category_id", "category_descript"), 
                    data.frame(enQuote(c("company_fund", "price", "company_info", "country_fund")), 
                               enQuote(c("company fundamental","price","company info","country fundamental"))))
 logger.info("Populated CATEGORY table")
@@ -209,7 +210,7 @@ tryCreateTable(conn, "frequency", specs)
 logger.info("Created FREQUENCY table")
 #q_str <- "INSERT OR REPLACE INTO frequency (freq, freq_name) VALUES ('Y','Anuual'),('S','Semiannual'),('Q','Quarterly'),('M','Monthly'),('D','Daily')"
 #stopifnot(trySendQuery(conn, q_str))
-tryInsertOrReplace(conn, "frequency", c("freq", "freq_name"), 
+tryBulkInsertOrReplace(conn, "frequency", c("freq", "freq_name"), 
 data.frame(enQuote(c("Y","S","Q","M","D")),enQuote(c("Anuual","Semiannual","Quarterly","Monthly","Daily"))) )
 logger.info("Populated FREQUENCY table")
 
@@ -250,7 +251,7 @@ for( i in seq(1, nrow(fql_map) )){
     note <- r$note
     ret <- trySelect(conn, "category", c("category_id"), paste("category_descript", "=", enQuote(category), sep=""))
     category_id <- ret$category_id
-    tryInsertOrReplace(conn, "fql", c("fql","syntax","description","unit","report_freq","category_id","note"),
+    tryBulkInsertOrReplace(conn, "fql", c("fql","syntax","description","unit","report_freq","category_id","note"),
               data.frame(c(enQuote(fql)),
                          c(enQuote2(syntax)),
                          c(enQuote(description)),
@@ -261,21 +262,6 @@ for( i in seq(1, nrow(fql_map) )){
                          )
               )
 
-}
-
-tryExtract <- function(param, id, d1, d2, freq, curr) {
-    #browser()
-    formula <- fql_map[param, ]$syntax
-    stopifnot(!is.empty(formula))
-    formula <- gsub("<ID>", id, formula)
-    formula <- gsub("<d1>",d1,formula)
-    formula <- gsub("<d2>",d2,formula)
-    formula <- gsub("<freq>",freq,formula)
-    formula <- gsub("<curr>",curr,formula)
-    logger.info(formula)
-    ret <- eval(parse(text=formula))
-    if(is.null(ret)) return(data.frame())
-    return(ret)
 }
 
 ########################################
@@ -314,8 +300,8 @@ fs_company_meta_colnames <- c("id",
 specs <- c("tablename VARCHAR(41) NOT NULL UNIQUE",
            "factset_id VARCHAR(20) NOT NULL",
            "fql VARCHAR(20) NOT NULL",
-           "usd INTEGER DEFAULT 0 NOT NULL",
-           "local INTEGER DEFAULT 0 NOT NULL",
+           "usd INTEGER",
+           "local INTEGER",
            "earliest INTEGER",
            "latest INTEGER",
            "PRIMARY KEY(factset_id, fql)",
@@ -334,7 +320,7 @@ for( fsid in universe ) {
     if( nrow(country) > 0 ){
         logger.debug(paste("Found the entry in the country table:", company$country))
     } else {
-        tryInsertOrReplace(conn, 
+        tryBulkInsertOrReplace(conn, 
                            "country", 
                            c("country", "region", "exchange", "curr", "curr_iso", "market"), 
                            data.frame(c(enQuote(company$country)),
@@ -354,7 +340,7 @@ for( fsid in universe ) {
     if( nrow(country) > 0 && !is.null(country$country_id) ){
         country_id <- country$country_id
     }
-    tryInsertOrReplace(conn, "company", 
+    tryBulkInsertOrReplace(conn, "company", 
                        c("factset_id",
                          "company_name",
                          "country_id",
@@ -385,16 +371,16 @@ for( fsid in universe ) {
         logger.info(paste("Created tseries table:", tablename, specs))
 
         controls <- get(paste(fs_prefix, param, sep=""), envir=config)
-        curr_list <- c(default_currency)
+        curr_list <- c(tolower(default_currency))
         freq_list <- c()
         
         if( all("LOCAL" %in% controls) ) {
-            if( default_currency != "local" ){
+            if( default_currency != "LOCAL" ){
                 curr_list <- cbind(curr_list, "local")
             }
         }
         if( all("USD" %in% controls) ){
-            if( default_currency != "usd" ){
+            if( default_currency != "USD" ){
                 curr_list <- cbind(curr_list, "usd")
             }
         }
@@ -417,9 +403,9 @@ for( fsid in universe ) {
                 data <- NULL
 
                 tryCatch({
-                    data <- tryExtract(param, fsid, fs.t0, fs.t1, freq, curr)
+                    data <- tryExtract(fql_map, param, fsid, fs.t0, fs.t1, freq, curr, MAX_TRIALS)
                 }, error=function(msg){
-                    logger.error(msg)
+                    logger.error(paste("Failed to extract FactSet param:", msg))
                     next
                 })
 
@@ -434,6 +420,9 @@ for( fsid in universe ) {
                 } else {
                     master_data <- merge(master_data, data, by=c("id", "date"))
                 }                
+            }
+            if( is.empty(master_data) ){
+                next
             }
             filter <- vector("logical", nrow(master_data))
             do_skip <- TRUE
@@ -456,19 +445,20 @@ for( fsid in universe ) {
                 next
             }
 
-            earliest <- julian(as.Date(filtered_data[1,2]))
-            latest <- julian(as.Date(filtered_data[nrow(filtered_data),2]))
+            earliest <- julianday(as.Date(filtered_data[1,2]))
+            latest <- julianday(as.Date(filtered_data[nrow(filtered_data),2]))
             for( begin in seq(1, nrow(filtered_data), 100) ){
                 end <- min(nrow(filtered_data), begin+100-1)
                 values <- NULL
                 if( ncol(filtered_data) > 3 ){
-                    values <- cbind(julian(as.Date(filtered_data[begin:end,][[2]])),
-                                    filtered_data[begin:end,][[c(3,4)]])
+                    values <- data.frame(julianday(as.Date(filtered_data[begin:end,][[2]])),
+                                    filtered_data[begin:end,][c(3,4)])
                 } else {
-                    values <- cbind(julian(as.Date(filtered_data[begin:end,][[2]])),
-                                    filtered_data[begin:end,][[3]])
+                    values <- data.frame(julianday(as.Date(filtered_data[begin:end,][[2]])),
+                                    filtered_data[begin:end,][c(3)])
                 }
-                tryInsertOrReplace(conn, 
+
+                tryBulkInsertOrReplace(conn, 
                                    tablename, 
                                    c("date", curr_list), 
                                    values,
@@ -485,7 +475,7 @@ for( fsid in universe ) {
                                  earliest,
                                  latest
             )
-            tryInsert(conn, "catalog", columns, values, MAX_TRIALS)
+            tryBulkInsert(conn, "catalog", columns, values, MAX_TRIALS)
         }
     }
 }

@@ -26,7 +26,7 @@ MAX_TRIALS <- 5
 
 started <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 
-config_file <- "/home/honda/mpg/dummy/createdb.conf"
+config_file <- "/home/honda/mpg/dummy/minidb.conf"
 config <- read_config(config_file) # returns an environment
 
 db <- get("DB", envir=config)
