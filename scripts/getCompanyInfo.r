@@ -40,11 +40,29 @@ getAvailableFQLs <- function(conn, fsid){
     return(data)
 }
 
+getTSeries <- function(conn, fsid, fql, t0, t1){
+
+    j0 <- julianday(as.Date(t0))
+    j1 <- julianday(as.Date(t1))
+
+    ret <- trySelect(conn, "catalog", 
+              c("tablename"), 
+              paste("factset_id='", fsid, "' AND fql='", fql, "'", sep=""))
+    return(ret$tablename)
+}
+
 db <- "/home/honda/sqlite-db/mini.sqlite"
 conn <<- dbConnect( SQLite(), db )
 print(paste("Opened SQLite database:", db))
-universe <- c("GOOG", "JP3902400005")
-r1 <- getCompanyInfo(conn, universe)
-r2 <- getAvailableFQLs(conn, universe[2])
 
+universe <- c("GOOG", "JP3902400005", "00105510")
+
+logger.init(level=logger.DEBUG,
+            do_stdout=TRUE)
+
+print(paste("Log file:", logfile))
+
+r1 <- getCompanyInfo(conn, universe)
+r2 <- getAvailableFQLs(conn, universe[3])
+r3 <- getTSeries(conn, universe[3], "FF_ASSETS", unjulianday(244330), unjulianday(2445791))
 dbDisconnect(conn)
