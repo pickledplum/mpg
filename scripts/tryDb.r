@@ -1,18 +1,11 @@
 library(RSQLite)
 source("logger.r")
+source("enQuote.r")
 #logger.init(logger.DEBUG, do_stdio=TRUE)
 
 MAX_FAILURES = 5
 
-enQuote <- function( items ){
-    return(paste("'", items, "'", sep=""))
-}
-enQuote2 <- function( items) {
-    return(paste("\"", items, "\"", sep=""))
-}
-enParen <- function( items ){
-    return(paste("(", items, ")", sep=""))
-}
+
 # tablename: tablename name
 # conditions: vector of SQL WHERE conditions
 # outwhat: vector of items to be returned
@@ -29,6 +22,10 @@ tryCreateTable <- function(conn, tablename, column_specs, max_failures=MAX_FAILU
     q_str <- paste("CREATE TABLE", enQuote(tablename), enParen(paste(column_specs,collapse=",")))
     return(trySendQuery(conn, q_str, max_failures))
 }
+tryCreateTempTable <- function(conn, tablename, column_specs, max_failures=MAX_FAILURES){
+    q_str <- paste("CREATE TEMP TABLE", enQuote(tablename), enParen(paste(column_specs,collapse=",")))
+    return(trySendQuery(conn, q_str, max_failures))
+}
 tryCreateTableIfNotExists <- function(conn, tablename, column_specs, max_failures=MAX_FAILURES){
     q_str <- paste("CREATE TABLE IF NOT EXISTS", enQuote(tablename), enParen(paste(column_specs, collapse=",")))
     return(trySendQuery(conn, q_str, max_failures))
@@ -37,9 +34,20 @@ tryDrop <- function(conn, tablename, max_failures=MAX_FAILURES){
     q_str <- paste("DROP TABLE IF EXISTS", tablename)
     return(trySendQuery(conn, q_str, max_failures))
 }
+tryCreateTempTableIfNotExists <- function(conn, tablename, column_specs, max_failures=MAX_FAILURES){
+    q_str <- paste("CREATE TEMP TABLE IF NOT EXISTS", enQuote(tablename), enParen(paste(column_specs, collapse=",")))
+    return(trySendQuery(conn, q_str, max_failures))
+}
 tryInsert <- function(conn, tablename, columns, values, max_failures=MAX_FAILURES){
     q_str <- paste("INSERT INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
-                   paste("(", paste(values, collapse=",")), ")", sep="")
+                   paste("(", paste(values, collapse=",")), ")")
+    return(trySendQuery(conn, q_str, max_failures))
+}
+tryUpdate <- function(conn, tablename, keyname, keyval, columns, values, max_failures=MAX_FAILURES){
+    assert.equal(length(columns), length(values))
+    to_exclude <- which(columns==keyname)
+    pairs <- paste(enQuote(columns),"=",values,sep="")
+    q_str <- paste("UPDATE", enQuote(tablename), "SET", paste(pairs,collapse=","), "WHERE", enQuote(keyname), "=", keyval)
     return(trySendQuery(conn, q_str, max_failures))
 }
 # value: data.frame, each frame contains the list of values for a variable.
