@@ -22,7 +22,7 @@ tryCatch({
 }
 )
 
-tablename <- 'yearly-FF_WKCAP'
+
 getUniverse <- function( 
     conn,
     year, 
@@ -32,6 +32,7 @@ getUniverse <- function(
     region=NULL, 
     sector=NULL, 
     industry=NULL ){
+    tablename <- 'yearly_FF_WKCAP'
     
     valcond_templ <- "[YEAR] >= MINVAL"
     where_templ <- ""
@@ -64,9 +65,3 @@ getUniverse <- function(
     print(q_str)
     return( tryGetQuery(conn, q_str) )
 }
-
-db <- "/home/honda/sqlite-db/mini.sqlite"
-conn <<- dbConnect( SQLite(), db )
-print(paste("Opened SQLite database:", db))
-r <- getUniverse(conn, 2013, 0)
-dbDisconnect(conn)
