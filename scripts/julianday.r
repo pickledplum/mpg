@@ -3,5 +3,5 @@ julianday <- function( date, ... ){
     return( julian(date, JDN0) )
 }
 unjulianday <- function( jdn, ... ){
-    return( as.Date(jdn + JDN0) )
+    return( as.Date(jdn+JDN0, origin="1970-01-01") )
 }
