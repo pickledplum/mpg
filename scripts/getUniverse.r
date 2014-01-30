@@ -63,5 +63,8 @@ getUniverse <- function(
     q_str <- gsub("YEAR", year, q_str)
     q_str <- gsub("MINVAL", minval, q_str)
     print(q_str)
-    return( tryGetQuery(conn, q_str) )
+    ret <- tryGetQuery(conn, q_str)
+    if( is.empty(ret) ) return(c())
+    
+    return(ret$id)
 }
