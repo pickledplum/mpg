@@ -1,5 +1,4 @@
 
-
 tryCatch({
     source("tryDb.r")
     source("assert.r")
@@ -65,14 +64,14 @@ getTSeries <- function(conn, fsid, fql, t0, t1){
     return(ret)
 }
 
-getBulkTSeries <- function(conn, fsid_list, fql, t0, t1) {
+getBulkTSeries <- function(conn, universe, fql, t0, t1) {
     j0 <- julianday(as.Date(t0))
     j1 <- julianday(as.Date(t1))
     temptable <- paste("bulk_", fql, sep="")
     trySendQuery(conn, paste("DROP TABLE IF EXISTS", temptable))
-    tryCreateTable(conn, temptable, c("date", enQuote(fsid_list)))
+    tryCreateTable(conn, temptable, c("date", enQuote(universe)))
     
-    for(fsid in fsid_list){
+    for(fsid in universe){
         tseries <- getTSeries(conn, fsid, fql, t0, t1)
         if( is.empty(tseries) ){
             logger.warn(paste("No data:", fsid, fql, "between", t0, "and", t1))
@@ -98,7 +97,7 @@ getBulkTSeries <- function(conn, fsid_list, fql, t0, t1) {
             }
         }
     }
-    ret <- trySelect(conn, temptable, c("date(date) as date", enQuote2(fsid_list)), c())
+    ret <- trySelect(conn, temptable, c("date(date) as date", enQuote2(universe)), c())
     return(ret)
 }
 

@@ -1,11 +1,18 @@
+#'
+#' Wrappers for dbSendQuery and dbGetQuery from RSQLite package
+#' These conveniense wrappers encapsulate error handling.
+#' Requires the "logger" unit being already initialized.
+#' 
+#' @seealso also: logger.r
+
 library(RSQLite)
 source("logger.r")
 source("enQuote.r")
-#logger.init(logger.DEBUG, do_stdio=TRUE)
 
+#' Maxinum number of failures allowed before bailing out
 MAX_FAILURES = 5
 
-
+#' 
 # tablename: tablename name
 # conditions: vector of SQL WHERE conditions
 # outwhat: vector of items to be returned
@@ -40,6 +47,11 @@ tryCreateTempTableIfNotExists <- function(conn, tablename, column_specs, max_fai
 }
 tryInsert <- function(conn, tablename, columns, values, max_failures=MAX_FAILURES){
     q_str <- paste("INSERT INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
+                   paste("(", paste(values, collapse=",")), ")")
+    return(trySendQuery(conn, q_str, max_failures))
+}
+tryInsertOrReplace <- function(conn, tablename, columns, values, max_failures=MAX_FAILURES){
+    q_str <- paste("INSERT OR REPLACE INTO", enQuote(tablename), enParen(paste(enQuote(columns), collapse=",")), "VALUES", 
                    paste("(", paste(values, collapse=",")), ")")
     return(trySendQuery(conn, q_str, max_failures))
 }

@@ -59,7 +59,7 @@ createdb <- function( conn, config ) {
     
     stopifnot( exists("MARKET", envir=config) )
     market <- toupper(get("MARKET", mode="character", envir=config))
-    stopifnot( market %in% c("TBD", "EM", "DM", "FM") )
+    stopifnot( market %in% c("WORLD", "EM", "DM", "FM") )
     
     stopifnot( exists("INDEX", envir=config) )
     finance.index <- get("INDEX", mode="character", envir=config)
@@ -114,7 +114,7 @@ createdb <- function( conn, config ) {
     ########################################
     #q_str <- "CREATE TABLE IF NOT EXiSTS country (country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE, country TEXT(100), region TEXT(50), exchange TEXT(50), curr_iso VARCHAR(3), curr TEXT(100), market VARCHAR(25))"
     #stopifnot(trySendQuery(conn, q_str))
-    specs <- c("country_id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE", 
+    specs <- c("country_id CHAR(2) PRIMARY KEY NOT NULL UNIQUE", 
                "country TEXT(100)", 
                "region TEST(50)", 
                "exchange TEXT(50)", 
@@ -130,7 +130,7 @@ createdb <- function( conn, config ) {
     #stopifnot(trySendQuery(conn, q_str))
     specs <- c("factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE", 
                "company_name TEXT(100)", 
-               "country_id INTEGER", 
+               "country_id CHAR(2)", 
                "sector VARCHAR(100)",
                "indgrp VARCHAR(100)",
                "industry VARCHAR(100)",
@@ -198,29 +198,17 @@ createdb <- function( conn, config ) {
     stopifnot(file.exists(fql_map_filename))
     fql_map <- read.csv(fql_map_filename)
     rownames(fql_map) <- fql_map$fql
-    for( i in seq(1, nrow(fql_map) )){
-        r <- fql_map[i,]
-        fql <- r$fql
-        syntax <- r$syntax
-        description <- r$description
-        unit <- r$unit
-        report_freq <- r$report_freq
-        category <- r$category
-        note <- r$note
-        ret <- trySelect(conn, "category", c("category_id"), paste("category_descript", "=", enQuote(category), sep=""))
-        category_id <- ret$category_id
-        tryBulkInsertOrReplace(conn, "fql", c("fql","syntax","description","unit","report_freq","category_id","note"),
-                  data.frame(c(enQuote(fql)),
-                             c(enQuote2(syntax)),
-                             c(enQuote(description)),
-                             c(unit),
-                             c(enQuote(report_freq)),
-                             c(enQuote(category_id)),
-                             c(enQuote(note))
-                             )
-                  )
-    
-    }
+    tryBulkInsert(conn, "fql", 
+                  c("fql","syntax","description","unit","report_freq","category_id","note"),
+                  data.frame(enQuote2(fql_map$fql),
+                             enQuote2(fql_map$syntax),
+                             enQuote(fql_map$description),
+                             fql_map$unit,
+                             enQuote(fql_map$report_freq),
+                             enQuote(fql_map$category_id),
+                             enQuote(fql_map$note)
+                  ))
+
     logger.info("Populated FQL table")
     ########################################
     # Company basics 
@@ -228,6 +216,7 @@ createdb <- function( conn, config ) {
     
     fs_company_info_list <- c("FG_COMPANY_NAME",
       "P_DCOUNTRY",
+      "P_COUNTRY_ISO",    
       "P_DCOUNTRY(REG)",
       "P_EXCHANGE",
       "P_CURRENCY",
@@ -242,7 +231,8 @@ createdb <- function( conn, config ) {
     fs_company_meta_colnames <- c("id", 
       "date", 
       "name", 
-      "country", 
+      "country",
+      "country_id",                           
       "region", 
       "exchange", 
       "curr", 
@@ -280,8 +270,9 @@ createdb <- function( conn, config ) {
         } else {
             tryBulkInsertOrReplace(conn, 
                                "country", 
-                               c("country", "region", "exchange", "curr", "curr_iso", "market"), 
-                               data.frame(c(enQuote(company$country)),
+                               c("country_id", "country", "region", "exchange", "curr", "curr_iso", "market"), 
+                               data.frame(c(enQuote(company$country_id)),
+                                          c(enQuote(company$country)),
                                           c(enQuote(company$region)),
                                           c(enQuote(company$exchange)),
                                           c(enQuote(company$curr)),
@@ -297,7 +288,8 @@ createdb <- function( conn, config ) {
         if( nrow(country) > 0 && !is.null(country$country_id) ){
             country_id <- country$country_id
         }
-        tryBulkInsertOrReplace(conn, "company", 
+        tryInsertOrReplace(conn, 
+                           "company", 
                            c("factset_id",
                              "company_name",
                              "country_id",
@@ -305,17 +297,17 @@ createdb <- function( conn, config ) {
                              "indgrp",
                              "industry",
                              "subind"),
-                           data.frame(c(enQuote(company$id)),
-                                      c(enQuote(company$name)),
-                                      c(country_id),
-                                      c(enQuote(company$sector)),
-                                      c(enQuote(company$indgrp)),
-                                      c(enQuote(company$industry)),
-                                      c(enQuote(company$subind))
+                           c(enQuote(company$id),
+                             enQuote(company$name),
+                             enQuote(country_id),
+                             enQuote(company$sector),
+                             enQuote(company$indgrp),
+                             enQuote(company$industry),
+                             enQuote(company$subind)
                            )
         )
         logger.info(paste("Registered to the company table:", company$id, company$name))
-        
+
         # register company
         for( fql in fql_list ){
             tablename <- paste(fql, fsid, sep="-")
@@ -435,8 +427,8 @@ createdb <- function( conn, config ) {
 #####################################
 # Constants
 #####################################
-db <- "/home/honda/sqlite-db/frontier.sqlite"
-config_file <- "/home/honda/mpg/dummy/fmdb.conf"
+db <- "/home/honda/sqlite-db/mini.sqlite"
+config_file <- "/home/honda/mpg/dummy/minidb.conf"
 wkdir <- "/home/honda/sqlite-db"
 logfile_name <- "frontier.log"
 do_stdout <- FALSE
