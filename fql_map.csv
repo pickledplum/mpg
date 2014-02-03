@@ -1,33 +1,33 @@
 fql,syntax,description,unit,report_frequency,category,note
-FF_ASSETS,"FF.ExtractFormulaHistory('<ID>', 'FF_ASSETS', '<d1>:<d2>:<freq>','curr=<curr>')",total assets,"1,000,000",annual,company fundamental,
-FF_ASSETS_CURR,"FF.ExtractFormulaHistory('<ID>', 'FF_ASSETS_CURR', '<d1>:<d2>:<freq>','curr=<curr>')",current assets,"1,000,000",annual,company fundamental,
-FF_CASH_ONLY,"FF.ExtractFormulaHistory('<ID>', 'FF_CASH_ONLY', '<d1>:<d2>:<freq>','curr=<curr>')",cash,"1,000,000",annual,company fundamental,
-FF_COM_EQ_RETAIN_EARN,"FF.ExtractFormulaHistory('<ID>', 'FF_COM_EQ_RETAIN_EARN', '<d1>:<d2>:<freq>','curr=<curr>')",retained earnings,"1,000,000",annual,company fundamental,
-FF_COM_SHS_OUT,"FF.ExtractFormulaHistory('<ID>', 'FF_COM_SHS_OUT', '<d1>:<d2>:<freq>')",Common shares outstanding,"1,000,000",annual,company fundamental,
-FF_DEBT,"FF.ExtractFormulaHistory('<ID>', 'FF_DEBT', '<d1>:<d2>:<freq>','curr=<curr>')",total debt,"1,000,000",annual,company fundamental,
-FF_DEBT_COM_EQ,"FF.ExtractFormulaHistory('<ID>', 'FF_DEBT_COM_EQ', '<d1>:<d2>:<freq>')",total debt to common equity,%,,company fundamental,FF_DEBT/FF_COM_EQ*100
+FF_ASSETS,"FF.ExtractFormulaHistory('<ID>', 'FF_ASSETS', '<d1>:<d2>:<freq>','curr=<curr>')",total assets,1000000,annual,company fundamental,
+FF_ASSETS_CURR,"FF.ExtractFormulaHistory('<ID>', 'FF_ASSETS_CURR', '<d1>:<d2>:<freq>','curr=<curr>')",current assets,1000000,annual,company fundamental,
+FF_CASH_ONLY,"FF.ExtractFormulaHistory('<ID>', 'FF_CASH_ONLY', '<d1>:<d2>:<freq>','curr=<curr>')",cash,1000000,annual,company fundamental,
+FF_COM_EQ_RETAIN_EARN,"FF.ExtractFormulaHistory('<ID>', 'FF_COM_EQ_RETAIN_EARN', '<d1>:<d2>:<freq>','curr=<curr>')",retained earnings,1000000,annual,company fundamental,
+FF_COM_SHS_OUT,"FF.ExtractFormulaHistory('<ID>', 'FF_COM_SHS_OUT', '<d1>:<d2>:<freq>')",Common shares outstanding,1000000,annual,company fundamental,
+FF_DEBT,"FF.ExtractFormulaHistory('<ID>', 'FF_DEBT', '<d1>:<d2>:<freq>','curr=<curr>')",total debt,1000000,annual,company fundamental,
+FF_DEBT_COM_EQ,"FF.ExtractFormulaHistory('<ID>', 'FF_DEBT_COM_EQ', '<d1>:<d2>:<freq>')",total debt to common equity,0.01,,company fundamental,FF_DEBT/FF_COM_EQ*100
 FF_DEBT_ST_TOT,"FF.ExtractFormulaHistory('<ID>', 'FF_DEBT_ST_TOT', '<d1>:<d2>:<freq>','curr=<curr>')",total short term debt,1,,company fundamental,
 FF_DEBT_LT_TOT,"FF.ExtractFormulaHistory('<ID>', 'FF_DEBT_LT_TOT', '<d1>:<d2>:<freq>')",total long term debt,1,,company fundamental,
-FF_DIV_YLD,"FF.ExtractFormulaHistory('<ID>', 'FF_DIV_YLD', '<d1>:<d2>:<freq>')",devident yield,%,,company fundamental,FF_DPS/FF_PRICE_CLOSE_FP*100
-FF_EBIT_OPER,"FF.ExtractFormulaHistory('<ID>', 'FF_EBIT_OPER', '<d1>:<d2>:<freq>','curr=<curr>')",EBIT,"1,000,000",,company fundamental,FF_SALES-FF_COGS-FF_SGA-FF_OPER_EXP_OTH
+FF_DIV_YLD,"FF.ExtractFormulaHistory('<ID>', 'FF_DIV_YLD', '<d1>:<d2>:<freq>')",devident yield,0.01,,company fundamental,FF_DPS/FF_PRICE_CLOSE_FP*100
+FF_EBIT_OPER,"FF.ExtractFormulaHistory('<ID>', 'FF_EBIT_OPER', '<d1>:<d2>:<freq>','curr=<curr>')",EBIT,1000000,,company fundamental,FF_SALES-FF_COGS-FF_SGA-FF_OPER_EXP_OTH
 FF_EBIT_OPER_PS,"FF.ExtractFormulaHistory('<ID>', 'FF_EBIT_OPER_PS', '<d1>:<d2>:<freq>','curr=<curr>')",EBIT per share,1,,company fundamental,
-FF_EBITDA_OPER,"FF.ExtractFormulaHistory('<ID>', 'FF_EBITDA_OPER', '<d1>:<d2>:<freq>','curr=<curr>')",EBIT plus depreciation & amortization,"1,000,000",,company fundamental,FF_EBIT_OPER+FF_DEP_AMORT_EXP or FF_EBIT_OPER+FF_DEP_EXP_CF
+FF_EBITDA_OPER,"FF.ExtractFormulaHistory('<ID>', 'FF_EBITDA_OPER', '<d1>:<d2>:<freq>','curr=<curr>')",EBIT plus depreciation & amortization,1000000,,company fundamental,FF_EBIT_OPER+FF_DEP_AMORT_EXP or FF_EBIT_OPER+FF_DEP_EXP_CF
 FF_EPS,"FF.ExtractFormulaHistory('<ID>', 'FF_EPS', '<d1>:<d2>:<freq>','curr=<curr>')",earnings per share -fiscal period,1,annual,company fundamental,
-FF_INT_EXP_DEBT,"FF.ExtractFormulaHistory('<ID>', 'FF_INIT_EXP_DEBT', '<d1>:<d2>:<freq>','curr=<curr>')",interst expense on debt,"1,000,000",annual,company fundamental,
-FF_INVEN,"FF.ExtractFormulaHistory('<ID>', 'FF_INVEN', '<d1>:<d2>:<freq>','curr=<curr>')",total inventories,"1,000,000",annual,company fundamental,
-FF_LIABS,"FF.ExtractFormulaHistory('<ID>', 'FF_LIABS', '<d1>:<d2>:<freq>','curr=<curr>')",total liabilities,"1,000,000",annual,company fundamental,
-FF_LIABS_CURR,"FF.ExtractFormulaHistory('<ID>', 'FF_LIABS_CURR', '<d1>:<d2>:<freq>','curr=<curr>')",total current liabilities,"1,000,000",annual,company fundamental,
-FF_MKT_VAL_PUBLIC,"FF.ExtractFormulaHistory('<ID>', 'FF_MKT_VAL_PUBLIC', '<d1>:<d2>:<freq>','curr=<curr>')",market capitalization (public),"1,000,000",,company fundamental,(Market_price - FF_PRICE_CLOSE_CP)*FF_COM_SHS_OUT-FF_SHS_CLOSELY_HELD
-FF_NET_INC,"FF.ExtractFormulaHistory('<ID>', 'FF_NET_INC', '<d1>:<d2>:<freq>','curr=<curr>')",net income,"1,000,000",,company fundamental,FF_NET_INCOME-FF_DISC_OPER or FF_NET_INCOME
-FF_NET_INC_CF,"FF.ExtractFormulaHistory('<ID>', 'FF_NET_INC_CF', '<d1>:<d2>:<freq>','curr=<curr>')",net income/starting line,"1,000,000",annual,company fundamental,
+FF_INT_EXP_DEBT,"FF.ExtractFormulaHistory('<ID>', 'FF_INIT_EXP_DEBT', '<d1>:<d2>:<freq>','curr=<curr>')",interst expense on debt,1000000,annual,company fundamental,
+FF_INVEN,"FF.ExtractFormulaHistory('<ID>', 'FF_INVEN', '<d1>:<d2>:<freq>','curr=<curr>')",total inventories,1000000,annual,company fundamental,
+FF_LIABS,"FF.ExtractFormulaHistory('<ID>', 'FF_LIABS', '<d1>:<d2>:<freq>','curr=<curr>')",total liabilities,1000000,annual,company fundamental,
+FF_LIABS_CURR,"FF.ExtractFormulaHistory('<ID>', 'FF_LIABS_CURR', '<d1>:<d2>:<freq>','curr=<curr>')",total current liabilities,1000000,annual,company fundamental,
+FF_MKT_VAL_PUBLIC,"FF.ExtractFormulaHistory('<ID>', 'FF_MKT_VAL_PUBLIC', '<d1>:<d2>:<freq>','curr=<curr>')",market capitalization (public),1000000,,company fundamental,(Market_price - FF_PRICE_CLOSE_CP)*FF_COM_SHS_OUT-FF_SHS_CLOSELY_HELD
+FF_NET_INC,"FF.ExtractFormulaHistory('<ID>', 'FF_NET_INC', '<d1>:<d2>:<freq>','curr=<curr>')",net income,1000000,,company fundamental,FF_NET_INCOME-FF_DISC_OPER or FF_NET_INCOME
+FF_NET_INC_CF,"FF.ExtractFormulaHistory('<ID>', 'FF_NET_INC_CF', '<d1>:<d2>:<freq>','curr=<curr>')",net income/starting line,1000000,annual,company fundamental,
 FF_OPER_INC_PS,"FF.ExtractFormulaHistory('<ID>', 'FF_OPER_INC_PS', '<d1>:<d2>:<freq>','curr=<curr>')",operating profit per share,1,annual,company fundamental,
 FF_OPER_MGN,"FF.ExtractFormulaHistory('<ID>', 'FF_OPER_MGN', '<d1>:<d2>:<freq>')",operating margin,0.01,,company fundamental,FF_OPER_INC/FF_SALES*100
 FF_PBK,"FF.ExtractFormulaHistory('<ID>', 'FF_PBK', '<d1>:<d2>:<freq>')",price to book value - closing price as of last fiscal period end,1,,company fundamental,FF_PRICE_CLOSE_FP/FF_BPS
 FF_PE,"FF.ExtractFormulaHistory('<ID>', 'FF_PE', '<d1>:<d2>:<freq>')",price to earnings - closing price as of fiscal period end,1,,company fundamental,FF_PRICE_CLOSE_FP/F_EPS
 FF_QUICK_RATIO,"FF.ExtractFormulaHistory('<ID>', 'FF_QUICK_RATIO', '<d1>:<d2>:<freq>')",quick ratio,1,,company fundamental,FF_ASSETS_CURR/FF_INVEN/FF_LIABS_CURR
 FF_ROE,"FF.ExtractFormulaHistory('<ID>', 'FF_ROE', '<d1>:<d2>:<freq>')",Return on earnings,1,,company fundamental,"FF_NET_INC/AVG(FF-SHLDRS_EQ(-1),FF_SHLDRS_EQ(0)), or LTM for FF_NET_INC for quarterly or semiannual"
-FF_SALES,"FF.ExtractFormulaHistory('<ID>', 'FF_SALES', '<d1>:<d2>:<freq>','curr=<curr>')",net sales or revenue,"1,000,000",,company fundamental,
-FF_WKCAP,"FF.ExtractFormulaHistory('<ID>', 'FF_WKCAP', '<d1>:<d2>:<freq>','curr=<curr>')",total working capital,"1,000,000",,company fundamental,FF_ASSETS_CURR-FF_LIABS_CURR
+FF_SALES,"FF.ExtractFormulaHistory('<ID>', 'FF_SALES', '<d1>:<d2>:<freq>','curr=<curr>')",net sales or revenue,1000000,,company fundamental,
+FF_WKCAP,"FF.ExtractFormulaHistory('<ID>', 'FF_WKCAP', '<d1>:<d2>:<freq>','curr=<curr>')",total working capital,1000000,,company fundamental,FF_ASSETS_CURR-FF_LIABS_CURR
 FG_CASHFL_OP_GR_A,"FF.ExtractFormulaHistory('<ID>', 'FG_CASHFL_OP_GR_A(<d1>,<d2>,<freq>,<curr>)', '<d1>:<d2>:<freq>')",gross cash flow from operations,1,,company fundamental,
 FG_EPS_LTG,"FF.ExtractFormulaHistory('<ID>', 'FG_EPS_LTG(<d1>,<d2>,<freq>)', '<d1>:<d2>:<freq>')",mean estimate for long term EPS growth rate,1,,company fundamental,
 FG_MKT_VALUE,"FF.ExtractFormulaHistory('<ID>', 'FG_MKT_VALUE(<d1>,<d2>,<freq>,<curr>)', '<d1>:<d2>:<freq>')",market value,1,quarterly,company fundamental,
