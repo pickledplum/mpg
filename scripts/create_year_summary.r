@@ -21,7 +21,7 @@ tryCatch({
 )
 
 create_year_summary <- function( conn, fql, do_drop=FALSE ){
-    
+    #browser()
     ########################################
     # Create summary table
     ########################################
@@ -38,6 +38,7 @@ create_year_summary <- function( conn, fql, do_drop=FALSE ){
     ########################################
     # Collect all the market values by year
     ########################################
+
     # collect table names from CATALOG table
     #SELECT factset_id, tablename, usd, earliest, latest FROM catalog
     catalog_ret <- trySelect(conn, 
@@ -84,10 +85,24 @@ create_year_summary <- function( conn, fql, do_drop=FALSE ){
         r <- tryGetQuery(conn, q_str)
         
         valid_years <- seq(earliest_year, latest_year, by=1)
+        valid_vals <- r$usd
+
+        if(is.empty(valid_vals) || all(is.na(valid_vals)) ){
+            logger.warn(paste("Empty table:", tablename))
+            next
+        }
+
+        if( any(is.na(r$usd)) || any(is.null(r$usd)) ) {
+            
+            toremove <- which(r$usd=="NA")
+            valid_years <- valid_years[-toremove]
+            valid_vals <- r$usd[-toremove]
+        }
+       
         tryInsert(conn, 
                   summary_tablename, 
                   cbind("factset_id", valid_years),
-                  cbind(enQuote(fsid), r$usd)
+                  cbind(enQuote(fsid), valid_vals)
         )
     }
     logger.info(paste("Populated table:", summary_tablename))

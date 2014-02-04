@@ -60,8 +60,11 @@ getTSeries <- function(conn, fsid, fql, t0, t1){
     str <- gsub("J0", j0, str)
     str <- gsub("J1", j1, str)
     ret <- tryGetQuery(conn, str)
+    rownames(ret) <- as.Date(ret$date)
+    ret <- ret[-c(1)]
+    t <- as.xts(ret) 
     
-    return(ret)
+    return(t)
 }
 
 getBulkTSeries <- function(conn, universe, fql, t0, t1) {
@@ -69,21 +72,30 @@ getBulkTSeries <- function(conn, universe, fql, t0, t1) {
     j1 <- julianday(as.Date(t1))
     temptable <- paste("bulk_", fql, sep="")
     trySendQuery(conn, paste("DROP TABLE IF EXISTS", temptable))
-    tryCreateTable(conn, temptable, c("date", enQuote(universe)))
-    
+    tryCreateTempTable(conn, temptable, c("date", enQuote(universe)))
+
     for(fsid in universe){
         tseries <- getTSeries(conn, fsid, fql, t0, t1)
         if( is.empty(tseries) ){
             logger.warn(paste("No data:", fsid, fql, "between", t0, "and", t1))
             next
         }
-        for( k in seq(1, length(tseries$date)) ){
-            date <- tseries$date[k]
+        dates <- rownames(as.data.frame(tseries))
+        for( k in seq(1, nrow(tseries)) ){
+            
+            date <- dates[k]
+            tryCatch({
+                julianday(as.Date(date) )
+            }, error=function(msg){
+                logger.error(paste("can't convert to julianday:", date))
+                next
+            })
             jdate <- julianday(as.Date(date))
             val <- tseries$usd[k]
             ret <- trySelect(conn, temptable, c("date"), paste("date=", jdate, sep=""))
             if( is.empty(ret) ){
                 #insert
+                
                 tryInsert(conn, temptable, c("date", fsid),
                           data.frame(c(jdate), c(val))
                 )
@@ -98,7 +110,11 @@ getBulkTSeries <- function(conn, universe, fql, t0, t1) {
         }
     }
     ret <- trySelect(conn, temptable, c("date(date) as date", enQuote2(universe)), c())
-    return(ret)
+
+    rownames(ret) <- as.Date(ret$date)
+    ret <- ret[-c(1)]
+    t <- as.xts(ret) 
+    return(t)
 }
 
 

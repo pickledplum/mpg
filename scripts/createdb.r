@@ -427,8 +427,8 @@ createdb <- function( conn, config ) {
 #####################################
 # Constants
 #####################################
-db <- "/home/honda/sqlite-db/mini.sqlite"
-config_file <- "/home/honda/mpg/dummy/minidb.conf"
+db <- "/home/honda/sqlite-db/frontier.sqlite"
+config_file <- "/home/honda/mpg/frontier.conf"
 wkdir <- "/home/honda/sqlite-db"
 logfile_name <- "frontier.log"
 do_stdout <- FALSE

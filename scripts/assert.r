@@ -43,7 +43,7 @@ assert.empty <- function(a){
     return(FALSE)
 }
 assert.non.empty <- function(a){
-    return(!assert(empty(a)))
+    return(!assert.empty(a))
 }
 assert.false <- function(a){
     stopifnot(!a)

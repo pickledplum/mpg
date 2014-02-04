@@ -1,27 +1,30 @@
 source("getCompanyInfo.r")
 source("getUniverse.r")
 source("logger.r")
+source("assert.r")
 library(RSQLite)
 
-db <- "/home/honda/sqlite-db/demo.sqlite"
+db <- "/home/honda/sqlite-db/frontier.sqlite"
 conn <<- dbConnect( SQLite(), db )
 print(paste("Opened SQLite database:", db))
 
 #universe <- c("GOOG", "JP3902400005", "00105510", "004561")
 
-logger.init(level=logger.DEBUG,
+logger.init(level=logger.WARN,
             do_stdout=TRUE)
 
 # Get the IDs of USA companies with working cap > $300M as of year 2013.
 universe <- getUniverse(conn, 
                         year=2013, 
-                        mktval=300, 
+                        mktval=0, 
                         market=NULL, 
-                        country="US", 
+                        country=NULL, 
                         region=NULL, 
                         sector=NULL, 
                         industry=NULL)
 
+assert.non.empty(universe)
+assert.ge(nrow(universe), 3)
 # Get company info (e.g. name)
 r1 <- getCompanyInfo(conn, 
                      universe=universe$id)
