@@ -12,19 +12,60 @@ source("enQuote.r")
 #' Maxinum number of failures allowed before bailing out
 MAX_FAILURES = 5
 
+#' SELECT <columns> FROM <tablename> WHERE <condition>
+#'  
+#' @param conn A connection to the database
+#' @param tablename The tablename name from which data is drawn.
+#' @param columns The vector of column names
+#' @param condition The WHERE clause, in string. NULL for none by default.
+#' @param is_distinct TRUE if you want duplicates elimiated.  FALSE to keep duplicates.
+#' @param max_failures The maximum number of failures before bailing out.
 #' 
-# tablename: tablename name
-# conditions: vector of SQL WHERE conditions
-# outwhat: vector of items to be returned
-trySelect <- function(conn, tablename, columns, conditions, is_distinct=TRUE, max_failures=MAX_FAILURES){
-    if( is.empty(conditions) ){
+#' @return A non-empty data.frame if successful.  An empty, non-null, data.frame object otherwise.
+#' 
+#' @example  Draw from the company table the company IDs and belonging country IDs only if they are from USA or Great Britain.
+#' Try no more than once in case of transaction failure.  Elimiate duplicates.
+#' 
+#' trySelect(conn=conn, 
+#'           columns=c("company", "company_id", "country_id"),
+#'           condition="country_id='US' OR country_id='GB'",
+#'           is_disntict=TRUE,
+#'           max_failures=1)
+#' 
+#' Note that elements of the condition string must be properly quoted, as it is passed into SQL as it is.
+#' On the other hand, the tablename and the column names are automatically quoted.
+#' 
+trySelect <- function(conn, tablename, columns, condition=NULL, is_distinct=TRUE, max_failures=MAX_FAILURES){
+    if( is.empty(condition) ){
         q_str <- paste("SELECT", ifelse(is_distinct, "DISTINCT", ""), paste(columns, collapse=","), "FROM", enQuote(tablename))
         
     } else{
-        q_str <- paste("SELECT", ifelse(is_distinct, "DISTINCT", ""), paste(columns, collapse=","), "FROM", enQuote(tablename), "WHERE", conditions)
+        q_str <- paste("SELECT", ifelse(is_distinct, "DISTINCT", ""), paste(columns, collapse=","), "FROM", enQuote(tablename), "WHERE", condition)
     }
     return(tryGetQuery(conn, q_str, max_failures))
 }
+#' CREATE TABLE <tablename> (<spec_list>)
+#'  
+#' @param conn A connection to the database
+#' @param tablename The tablename name from which data is drawn.
+#' @param columns The vector of column names
+#' @param spec_list The vector of column specifications.
+#' @param max_failures The maximum number of failures before bailing out.
+#' 
+#' @return TRUE if successful.  FALSE otherwise.
+#' 
+#' @example  Create a table called "item", which has two columns "id" and "item_name".
+#' "id" is the primary key, and automatically increamented.  "item_name" holds the name of item.
+#' 
+#' 
+#' trySelect(conn=conn, 
+#'           columns=c("id", "item_name"),
+#'           spec_list=c("INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL UNIQUE",
+#'                       "VARCHAR(20) NOT NULL"))
+#'           
+#' 
+#' Note: he tablename and the column names are automatically quoted.
+#'
 tryCreateTable <- function(conn, tablename, column_specs, max_failures=MAX_FAILURES){
     q_str <- paste("CREATE TABLE", enQuote(tablename), enParen(paste(column_specs,collapse=",")))
     return(trySendQuery(conn, q_str, max_failures))

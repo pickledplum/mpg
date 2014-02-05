@@ -2,9 +2,10 @@ source("getCompanyInfo.r")
 source("getUniverse.r")
 source("logger.r")
 source("assert.r")
+library(xts)
 library(RSQLite)
 
-db <- "/home/honda/sqlite-db/frontier.sqlite"
+db <- "/home/honda/sqlite-db/mini.sqlite"
 conn <<- dbConnect( SQLite(), db )
 print(paste("Opened SQLite database:", db))
 
@@ -13,7 +14,7 @@ print(paste("Opened SQLite database:", db))
 logger.init(level=logger.WARN,
             do_stdout=TRUE)
 
-# Get the IDs of USA companies with working cap > $300M as of year 2013.
+# Get the IDs of companies with working cap > $300M as of year 2013.
 universe <- getUniverse(conn, 
                         year=2013, 
                         mktval=0, 
@@ -23,12 +24,16 @@ universe <- getUniverse(conn,
                         sector=NULL, 
                         industry=NULL)
 
-assert.non.empty(universe)
-assert.ge(nrow(universe), 3)
+
 # Get company info (e.g. name)
 r1 <- getCompanyInfo(conn, 
                      universe=universe$id)
-
+if(is.empty(universe) ){
+    stop()
+}
+if(nrow(universe) < 3) {
+    stop()
+}
 # Get FQL values available for a company
 r2 <- getAvailableFQLs(conn, 
                        fsid=universe$id[3])

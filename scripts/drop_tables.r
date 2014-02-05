@@ -2,7 +2,7 @@ library(RSQLite)
 
 drop_tables <- function(conn, exclude=c()){
     
-    table_list <- dbGetQuery(conn, "SELECT name FROM sqlite_master WHERE type='table'")
+    table_list <- dbGetQuery(conn, "SELECT name FROM sqlite_master WHERE type='table' AND name<>'sqlite_sequence'")
     table_list <- as.array(table_list[[1]])
     
     apply(table_list, 1, function(x){

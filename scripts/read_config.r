@@ -51,7 +51,3 @@ read_config <- function( config_file ) {
     }
     return(env)
 }
-
-config <- read_config("/home/honda/mpg/dummy/params.conf")
-#get("FF_ASSETS", config)
-#exists(config)
