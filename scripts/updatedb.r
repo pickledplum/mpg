@@ -23,7 +23,7 @@ tryCatch({
     stop()
 }
 )    
-createdb <- function( conn, config) {
+updatedb <- function(conn, config) {
 
     ########################################
     # Configure FS
@@ -110,139 +110,189 @@ createdb <- function( conn, config) {
     logger.info(paste("FACTSET items:", paste(fql_list, collapse=",")))
     
     ########################################
-    # Create Country Table
+    # Sanity check COUNTRY table
     ########################################
-    specs <- c("country_id CHAR(2) PRIMARY KEY NOT NULL UNIQUE", 
-               "country TEXT(100)", 
-               "region TEST(50)", 
-               "exchange TEXT(50)", 
-               "curr_iso VARCHAR(3)", 
-               "curr TEXT(100)", 
-               "market VARCHAR(25)" )
-    tryCreateTable(conn, "country", specs)
-    logger.info("Created COUNTRY table")
-    ########################################
-    # Create COMPANY table
-    ########################################
-    specs <- c("factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE", 
-               "company_name TEXT(100)", 
-               "country_id CHAR(2)", 
-               "sector VARCHAR(100)",
-               "indgrp VARCHAR(100)",
-               "industry VARCHAR(100)",
-               "subind VARCHAR(100)",
-               "FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE"
-    )
-    
-    tryCreateTable(conn, "company", specs)
-    logger.info("Created COMPANY table")
-    
-    ########################################
-    # Create CATEGORY table
-    ########################################
-    specs <- c("category_id VARCHAR(50) PRIMARY KEY NOT NULL UNIQUE", 
-               "category_descript TEXT(50) NOT NULL UNIQUE"
-    )
-    tryCreateTable(conn, "category", specs)
-    logger.info("Created CATEGORY table")
-    
-    tryBulkInsertOrReplace(conn, "category", c("category_id", "category_descript"), 
-                       data.frame(enQuote(c("company_fund", "price", "company_info", "country_fund")), 
-                                  enQuote(c("company fundamental","price","company info","country fundamental"))))
-    logger.info("Populated CATEGORY table")
+#     specs <- c("country_id CHAR(2) PRIMARY KEY NOT NULL UNIQUE", 
+#                "country TEXT(100)", 
+#                "region TEST(50)", 
+#                "exchange TEXT(50)", 
+#                "curr_iso VARCHAR(3)", 
+#                "curr TEXT(100)", 
+#                "market VARCHAR(25)" )
+    country.columns <- c("country_id", 
+                         "country", 
+                         "region", 
+                         "exchange", 
+                         "curr_iso", 
+                         "curr", 
+                         "market")
+    ret <- trySelect(conn, "country", c("*"), c())
+    if(!intersect(colnames(ret), country.columns) == country.columns){
+        logger.error(paste(
+                        "COUNTRY table does not contain all the expected attributes.  Expected:", 
+                        paste(country.columns, collapse=","))
+        )
+        stop()
+    }
+    logger.info("Schema compatible: COUNTRY table")
     
     ########################################
-    # Create FREQUENCY table
+    # Sanity check COMPANY table
     ########################################
-    specs <- c("freq VARCHAR(1) PRIMARY KEY NOT NULL UNIQUE",
-               "freq_name VARCHAR(20) UNIQUE"
-    )
-    tryCreateTable(conn, "frequency", specs)
-    logger.info("Created FREQUENCY table")
-    #q_str <- "INSERT OR REPLACE INTO frequency (freq, freq_name) VALUES ('Y','Anuual'),('S','Semiannual'),('Q','Quarterly'),('M','Monthly'),('D','Daily')"
-    #stopifnot(trySendQuery(conn, q_str))
-    tryBulkInsertOrReplace(conn, "frequency", c("freq", "freq_name"), 
-    data.frame(enQuote(c("Y","S","Q","M","D")),enQuote(c("Anuual","Semiannual","Quarterly","Monthly","Daily"))) )
-    logger.info("Populated FREQUENCY table")
+#     specs <- c("factset_id VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE", 
+#                "company_name TEXT(100)", 
+#                "country_id CHAR(2)", 
+#                "sector VARCHAR(100)",
+#                "indgrp VARCHAR(100)",
+#                "industry VARCHAR(100)",
+#                "subind VARCHAR(100)",
+#                "FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE"
+#     )
+    company.columns <- c("factset_id",
+                         "company_name",
+                         "country_id",
+                         "sector",
+                         "indgrp",
+                         "industry",
+                         "subind")
+                        
+    ret <- trySelect(conn, "company", c("*"), c())
+    if(!intersect(colnames(ret), company.columns) == company.columns){
+        logger.error(paste(
+            "COMPANY table does not contain all the expected attributes.  Expected:", 
+            paste(company.columns, collapse=","))
+        )
+        stop()
+    }
+    logger.info("Schema compatible: COMPANY table")
     
     ########################################
-    # Create FQL table
+    # Sanity check CATEGORY table
     ########################################
-    specs <- c("fql VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE", 
-               "syntax TEXT(200)",
-               "description TEXT(100)", 
-               "unit FLOAT", 
-               "report_freq CHAR(1)", 
-               "category_id VARCHAR(50)", 
-               "note TEXT(200)", 
-               "FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
-               "FOREIGN KEY(report_freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE"
-    )
-    tryCreateTable(conn, "fql", specs)
-    logger.info("Created FQL table")
+#     specs <- c("category_id VARCHAR(50) PRIMARY KEY NOT NULL UNIQUE", 
+#                "category_descript TEXT(50) NOT NULL UNIQUE"
+#     )
+#     tryBulkInsertOrReplace(conn, "category", c("category_id", "category_descript"), 
+#                            data.frame(enQuote(c("company_fund", "price", "company_info", "country_fund")), 
+#                                       enQuote(c("company fundamental","price","company info","country fundamental"))))
+#     
+    category.columns <- c("category_id", "category_descript")
+    ret <- trySelect(conn,  "category", c("*"), c())
+    if(!intersect(colnames(ret), category.columns) == category.columns){
+        logger.error(paste(
+            "CATEGORY table does not contain all the expected attributes.  Expected:", 
+            paste(category.columns, collapse=","))
+        )
+        stop()
+    }
+    logger.info("Schema compatible: CATEGORY table")
     
-    stopifnot( exists("FQL_MAP", envir=config) )
-    fql_map_filename <- get("FQL_MAP", envir=config)
-    stopifnot(file.exists(fql_map_filename))
-    fql_map <- read.csv(fql_map_filename)
-    rownames(fql_map) <- fql_map$fql
-    tryBulkInsert(conn, "fql", 
-                  c("fql","syntax","description","unit","report_freq","category_id","note"),
-                  data.frame(enQuote2(fql_map$fql),
-                             enQuote2(fql_map$syntax),
-                             enQuote(fql_map$description),
-                             fql_map$unit,
-                             enQuote(fql_map$report_freq),
-                             enQuote(fql_map$category_id),
-                             enQuote(fql_map$note)
-                  ))
+    ########################################
+    # Sanity check FREQUENCY table
+    ########################################
+#     specs <- c("freq VARCHAR(1) PRIMARY KEY NOT NULL UNIQUE",
+#                "freq_name VARCHAR(20) UNIQUE"
+#     )
+#     tryBulkInsertOrReplace(conn, 
+#                            "frequency", 
+#                            c("freq", "freq_name"), 
+#                            data.frame(enQuote(c("Y","S","Q","M","D")),
+#                                       enQuote(c("Anuual","Semiannual","Quarterly","Monthly","Daily"))) )
+    frequency.columns <- c("freq", "freq_name")
+    ret <- trySelect(conn,  "frequency", c("*"), c())
+    if(!intersect(colnames(ret), frequency.columns) == frequency.columns){
+        logger.error(paste(
+            "FREQUENCY table does not contain all the expected attributes.  Expected:", 
+            paste(frequency.columns, collapse=","))
+        )
+        stop()
+    }
+    logger.info("Schema compatible: FREQUENCY table")
+    
+    ########################################
+    # Sainity check FQL table
+    ########################################
+#     specs <- c("fql VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE", 
+#                "syntax TEXT(200)",
+#                "description TEXT(100)", 
+#                "unit FLOAT", 
+#                "report_freq CHAR(1)", 
+#                "category_id VARCHAR(50)", 
+#                "note TEXT(200)", 
+#                "FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
+#                "FOREIGN KEY(report_freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE"
+#     )
 
-    logger.info("Populated FQL table")
-    ########################################
-    #  Create CATALOG table  
-    ########################################
+    fql.columns <- c("fql",
+                     "syntax",
+                     "description",
+                     "unit",
+                     "report_freq",
+                     "category_id",
+                     "note")
+    ret <- trySelect(conn,  "fql", c("*"), c())
+    if(!intersect(colnames(ret), fql.columns) == fql.columns){
+        logger.error(paste(
+            "FQL table does not contain all the expected attributes.  Expected:", 
+            paste(fql.columns, collapse=","))
+        )
+        stop()
+    }
+    logger.info("Schema compatible: FQL table")
     
-    fs_company_info_list <- c("FG_COMPANY_NAME",
-      "P_DCOUNTRY",
-      "P_COUNTRY_ISO",    
-      "P_DCOUNTRY(REG)",
-      "P_EXCHANGE",
-      "P_CURRENCY",
-      "P_CURRENCY_CODE",
-      "FE_COMPANY_INFO(ISIN)",
-      "FE_COMPANY_INFO(SEDOL)",
-      "FG_GICS_SECTOR",
-      "FG_GICS_INDGRP",
-      "FG_GICS_INDUSTRY",
-      "FG_GICS_SUBIND")
+    ########################################
+    # Sanity check CATALOG table 
+    ########################################
+    fs_company_info_list <- c(
+          "FG_COMPANY_NAME",
+          "P_DCOUNTRY",
+          "P_COUNTRY_ISO",    
+          "P_DCOUNTRY(REG)",
+          "P_EXCHANGE",
+          "P_CURRENCY",
+          "P_CURRENCY_CODE",
+          "FE_COMPANY_INFO(ISIN)",
+          "FE_COMPANY_INFO(SEDOL)",
+          "FG_GICS_SECTOR",
+          "FG_GICS_INDGRP",
+          "FG_GICS_INDUSTRY",
+          "FG_GICS_SUBIND")
     
     catalog.columns <- c("id", 
-      "date", 
-      "name", 
-      "country",
-      "country_id",                           
-      "region", 
-      "exchange", 
-      "curr", 
-      "curr_code", 
-      "isin", 
-      "sedol",
-      "sector",
-      "indgrp",
-      "industry",
-      "subind")
-
-    specs <- c("tablename VARCHAR(41) NOT NULL UNIQUE",
-               "factset_id VARCHAR(20) NOT NULL",
-               "fql VARCHAR(20) NOT NULL",
-               "usd INTEGER",
-               "local INTEGER",
-               "earliest INTEGER",
-               "latest INTEGER",
-               "PRIMARY KEY(factset_id, fql)",
-               "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
-               "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE NO ACTION ON UPDATE CASCADE")
-    tryCreateTable(conn, "catalog", specs)
+                         "date", 
+                         "name", 
+                         "country",
+                         "country_id",
+                         "region",
+                         "exchange",
+                         "curr", 
+                         "curr_code", 
+                         "isin",
+                         "sedol",
+                         "sector",
+                         "indgrp",
+                         "industry",
+                         "subind")
+    
+#     specs <- c("tablename VARCHAR(41) NOT NULL UNIQUE",
+#                "factset_id VARCHAR(20) NOT NULL",
+#                "fql VARCHAR(20) NOT NULL",
+#                "usd INTEGER",
+#                "local INTEGER",
+#                "earliest INTEGER",
+#                "latest INTEGER",
+#                "PRIMARY KEY(factset_id, fql)",
+#                "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
+#                "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE NO ACTION ON UPDATE CASCADE")
+    ret <- trySelect(conn,  "catalog", c("*"), c())
+    if(!intersect(colnames(ret), catalog.columns) == catalog.columns){
+        logger.error(paste(
+            "CATALOG table does not contain all the expected attributes.  Expected:", 
+            paste(catalog.columns, collapse=","))
+        )
+        stop()
+    }
+    logger.info("Schema compatible: CATALOG table")
     
     ########################################
     # Create fql-company tables
@@ -509,17 +559,17 @@ on.exit(function(){ dbDisconnect(conn); logger.warn("Closed db") })
 #####################################
 # Drop tables
 #####################################
-drop_tables(conn)
+#drop_tables(conn)
 
 #####################################
 # Bulk init DB
 #####################################
-createdb(conn, config)
+updatedb(conn, config)
 
 #####################################
 # Bulk init DB
 #####################################
-create_year_summary(conn, "FF_WKCAP", do_drop=FALSE)
+#create_year_summary(conn, "FF_WKCAP", do_drop=FALSE)
 
 #####################################
 # Close DB
