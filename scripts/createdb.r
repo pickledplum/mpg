@@ -476,7 +476,7 @@ createdb <- function( conn, config) {
 #####################################
 # Constants
 #####################################
-db_name <- "mini"
+db_name <- "frontier"
 db <- paste("/home/honda/sqlite-db/", db_name, ".sqlite", sep="")
 config_file <- paste("/home/honda/mpg/", db_name, ".conf", sep="")
 wkdir <- "/home/honda/sqlite-db"
@@ -521,7 +521,7 @@ on.exit(function(){ dbDisconnect(conn); logger.warn("Closed db") })
 #####################################
 # Drop tables
 #####################################
-drop_tables(conn)
+#drop_tables(conn)
 
 #####################################
 # Bulk init DB
