@@ -147,16 +147,16 @@ getTSeries <- function(conn, fsid, fql, t0, t1){
 #' @return A non-empty XTS object containg the time series if successful.  An empty but non-null XTS if failed.
 #' 
 #' @example Get the price data, devident compounded, from 1/1/2000 to 12/31/2013.
-#' getBulkTSeries(conn, c("GOOG", "002826"), "P_TOTAL_RETURNC", "2013-12-20", "2013-12-31")
+#' getBulkTSeries(conn, c("GOOG","JP3902400005"), universe=universe$id, fql="FF_ASSETS", t0="2010-01-01", t1="2013-12-31")
 #' 
-#' GOOG    002826
-#' 2013-12-20  1.3257027 0.8068323
-#' 2013-12-23  1.3156176 2.0081282
-#' 2013-12-24 -0.2923489 0.5901456
-#' 2013-12-26  0.5054712 0.3083706
-#' 2013-12-27  0.0841260 0.7845283
-#' 2013-12-30 -0.7993639 0.8440256
-#' 2013-12-31  1.0140061 0.4054427
+#'             GOOG JP3902400005
+#' 2010-03-31    NA     34408.11
+#' 2010-12-31 57851           NA
+#' 2011-03-31    NA     40210.90
+#' 2011-12-31 72574           NA
+#' 2012-03-31    NA     41213.33
+#' 2012-12-31 93798           NA
+#' 2013-03-31    NA     36273.25
 #' 
 getBulkTSeries <- function(conn, universe, fql, t0, t1) {
     j0 <- julianday(as.Date(t0))
