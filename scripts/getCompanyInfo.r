@@ -61,26 +61,35 @@ getAvailableFQLs <- function(conn, fsid){
     return(data)
 }
 
-#' Get the SQL table name
+#' Get the SQL database name and the table name
 #' 
 #' @param fsid A FactSet ID
 #' @param fql A FQL parameter
 #' 
-#' @example
+#' @example 
+#' The time series for FF_ASSETS for Google is stored in the FF_ASSETS.sqlite database.
+#' 
 #' t <- findTablename(conn, "GOOG", "FF_ASSETS")
 #' print(t)
+#' print(class(t))
 #' 
-#' > "FF_ASSETS-GOOG"
+#' > "FF_ASSETS.sqlite" "FF_ASSETS-GOOG"
+#' > character()
 #' 
 findTablename <- function(conn, fsid, fql) {
     str <- "factset_id='FSID' AND fql='FQL'"
     str <- gsub("FSID", fsid, str)
     str <- gsub("FQL", fql, str)
     ret <- trySelect(conn, "catalog", 
-                     c("tablename"), 
+                     c("dbname", "tablename"), 
                      str)
-    if( is.empty(ret) ) return("")
-    return(ret$tablename)
+    if( is.empty(ret) ){
+        return(xts())
+    }
+    pair <- c(ret$dbname, ret$tablename)
+    names(pair) <- c("dbname", "tablename")
+    
+    return(pair)
 }
 #' Get the time series corresponding to the company & the FactSet parameter
 #' 
@@ -108,21 +117,33 @@ findTablename <- function(conn, fsid, fql) {
 #' > 2013-12-30  -0.799363852
 #' > 2013-12-31   1.014006138
 #' 
-getTSeries <- function(conn, fsid, fql, t0, t1){
+getTSeries <- function(meta_conn, dbdir, fsid, fql, t0, t1){
 
     j0 <- julianday(as.Date(t0))
     j1 <- julianday(as.Date(t1))
     
-    tablename <- findTablename(conn, fsid, fql)
+    ret <- findTablename(meta_conn, fsid, fql)
+    if( is.empty(ret) ){
+        logger.error(paste("No table found:", fsid, fql))
+        return()
+    }
+    dbname <- ret["dbname"]
+    db <- file.path(dbdir, dbname)
+    tablename <- ret["tablename"]
+
     if( is.empty(tablename) ){
-        logger.error(paste("No table for:", fsid, fql))
+        logger.error(paste("No table for:", fsid, ",", fql))
         return(xts())
     }
+    conn <- dbConnect(SQLite(), db)
+    logger.info(paste("Opened db:", db))
     str <- "SELECT date(date) AS date, usd FROM 'TABLENAME' WHERE date BETWEEN J0 AND J1"
     str <- gsub("TABLENAME", tablename, str)
     str <- gsub("J0", j0, str)
     str <- gsub("J1", j1, str)
     ret <- tryGetQuery(conn, str)
+    dbDisconnect(conn)
+    
     if( is.empty(ret) ) {
         logger.warn(paste("No data avaiable:", fsid, fql))
         return(xts())
@@ -158,7 +179,7 @@ getTSeries <- function(conn, fsid, fql, t0, t1){
 #' 2012-12-31 93798           NA
 #' 2013-03-31    NA     36273.25
 #' 
-getBulkTSeries <- function(conn, universe, fql, t0, t1) {
+getBulkTSeries <- function(conn, dbdir, universe, fql, t0, t1) {
     j0 <- julianday(as.Date(t0))
     j1 <- julianday(as.Date(t1))
     temptable <- paste("bulk_", fql, sep="")
@@ -167,7 +188,7 @@ getBulkTSeries <- function(conn, universe, fql, t0, t1) {
     tryCreateTempTable(conn, temptable, specs)
 
     for(fsid in universe){
-        tseries <- getTSeries(conn, fsid, fql, t0, t1)
+        tseries <- getTSeries(conn, dbdir, fsid, fql, t0, t1)
         #print(tseries)
         if( is.empty(tseries) ){
             logger.warn(paste("No data:", fsid, fql, "between", t0, "and", t1))

@@ -20,8 +20,13 @@ tryCatch({
 }
 )
 
-create_year_summary <- function(meta_conn, dbdir, fql, do_drop=FALSE ){
-
+create_year_summary <- function(dbdir, metadb, fql, do_drop=FALSE ){
+    
+    dbpath <- file.path(dbdir, metadb)
+    meta_conn <- dbConnect( SQLite(), dbpath )
+    logger.warn(paste("Opened SQLite database:", dbpath))
+    #on.exit(dbDisconnect(meta_conn))
+            
     ########################################
     # Collect all the market values by year
     ########################################
@@ -48,7 +53,7 @@ create_year_summary <- function(meta_conn, dbdir, fql, do_drop=FALSE ){
     tryDrop(meta_conn, summary_tablename)
     tryCreateTableIfNotExists(meta_conn, summary_tablename, specs)
     logger.info(paste("Created table:", summary_tablename))
-    
+    stack <- c()
     julian_yearends <- julianday(yearends)
     for( i in seq(1, nrow(catalog_ret)) ){
         attributes <- catalog_ret[i,]
@@ -89,7 +94,7 @@ create_year_summary <- function(meta_conn, dbdir, fql, do_drop=FALSE ){
             q_str <- paste(q_str, q0_str)
         }
         r <- tryGetQuery(tseries_dbconn, q_str)
-        
+        dbDisconnect(tseries_dbconn)
 
         valid_years <- year(r$date)
         valid_vals <- r$usd
@@ -110,6 +115,8 @@ create_year_summary <- function(meta_conn, dbdir, fql, do_drop=FALSE ){
                   c(enQuote(fsid), valid_vals)
         )
     }
+    dbDisconnect(meta_conn)
+    
     logger.info(paste("Populated table:", summary_tablename))
     return(0)
 }

@@ -9,7 +9,6 @@ tryCatch({
     source("is.empty.r")
     source("drop_tables.r")
     source("create_year_summary.r")
-    source("createMetaDb.r")
     source("initTseriesDb.r")
     source("createFreqTable.r")
     source("createFqlTable.r")
@@ -29,7 +28,7 @@ tryCatch({
 #####################################
 tag <- "mini"
 dbdir <- "/home/honda/sqlite-db"
-wkdir <- "/home/honda/sqlite-db"
+wkdir <- dbdir
 
 dbname <- paste(tag, ".sqlite", sep="")
 dbpath <- file.path(dbdir, dbname)
@@ -75,7 +74,7 @@ logger.warn(paste("Opened SQLite database:", dbpath))
 #####################################
 # Drop tables
 #####################################
-#drop_tables(meta_conn, exclude=c("country", "company", "fql", "frequency"))
+drop_tables(meta_conn, exclude=c("category", "fql", "frequency"))
 #drop_tables(meta_conn)
 
 #####################################
@@ -95,15 +94,17 @@ tseries_dbname_list <- initTseriesDb(meta_conn, config, dbdir)
 logger.debug(paste("T-series dbs:", paste(tseries_dbname_list, collapse=",")))
 
 #####################################
-# Create WKCap summary table
-#####################################
-create_year_summary(meta_conn, dbdir, "FF_WKCAP", do_drop=FALSE)
-
-#####################################
 # Close DB
 #####################################
 dbDisconnect(meta_conn)
 logger.warn("Closed db")
+
+#####################################
+# Create WKCap summary table
+#####################################
+create_year_summary(dbdir, dbname, "FF_WKCAP", do_drop=TRUE)
+
+
 #####################################
 # Close Logger
 #####################################
