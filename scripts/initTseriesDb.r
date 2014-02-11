@@ -12,7 +12,6 @@ tryCatch({
     source("is.empty.r")
     source("drop_tables.r")
     source("julianday.r")
-    source("create_year_summary.r")
     source("enQuote.r")
     
 }, warning=function(msg){
@@ -22,8 +21,9 @@ tryCatch({
     print(msg)
     stop()
 }
-)    
-initTseriesDb <- function( conn, config) {
+) 
+
+initTseriesDb <- function(meta_conn, config, dbdir) {
 
     ########################################
     # Configure FS
@@ -140,7 +140,8 @@ initTseriesDb <- function( conn, config) {
     ########################################
     #  Create CATALOG table  
     ########################################
-    catalog.column.name <- c("tablename",
+    catalog.column.name <- c("dbname",
+                             "tablename",
                              "factset_id",
                              "fql",
                              "usd",
@@ -148,92 +149,6 @@ initTseriesDb <- function( conn, config) {
                              "earliest",
                              "latest")
     
-    # Company & contry tables
-    for( fsid in universe ) {
-        dbSendQuery(conn, "BEGIN")
-        
-        tryCatch({
-            # Get company meta data
-            company <- FF.ExtractDataSnapshot(fsid, paste(company.meta.fql, collapse=","))
-            if( is.empty(company) ){
-                stop(paste("Empty company meta data:", fsid))
-            }
-            if( ncol(company) != length(company.meta.titles) ) {
-                stop(paste("Collapted company meta data:", fsid))
-            }
-            colnames(company) <- company.meta.titles 
-            
-            # Extract country info and register to the country table
-            
-            # See if the country is already registered
-            country_id <- trySelect(conn, "country", c("country_id"), paste("country_id=",enQuote(company$country_id), sep=""))
-            if( is.empty(country_id) ){
-                tryInsert(conn,
-                          "country", 
-                          country.column.name, 
-                          c(enQuote(company$country_id),
-                            enQuote(company$country),
-                            enQuote(company$region),
-                            enQuote(company$exchange),
-                            enQuote(company$curr),
-                            enQuote(company$curr_code),
-                            enQuote(market)
-                          )
-                )
-                logger.info(paste("Registered to the country table:", company$country))
-                country_id <- company$country_id
-            }
-            if( is.empty(country_id) ){
-                logger.error(paste("Country ID is missing:", fsid, fql))
-                stop()
-            }
-            if( is.empty(company$id)
-                || is.empty(company$name)
-                || is.empty(company$sector)
-                || is.empty(company$indgrp)
-                || is.empty(company$industry)
-                || is.empty(company$subind) ) {
-                logger.error(paste("Something is missing to register the country to the country table:", country_id))
-                stop()
-            }
-            columns <- c("factset_id",
-                         "company_name",
-                         "country_id"
-            )
-            
-            values <- c(enQuote(company$id),
-                        enQuote(company$name),
-                        enQuote(country_id)
-            )
-            if( !is.na(company$sector) ){
-                columns <- c(columns, "sector")
-                values <- c(values, enQuote(company$sector))
-            }
-            if( !is.na(company$indgrp) ){
-                columns <- c(columns, "indgrp")
-                values <- c(values, enQuote(company$indgrp))
-            }
-            if( !is.na(company$industry) ){
-                columns <- c(columns, "industry")
-                values <- c(values, enQuote(company$industry))
-            }
-            if( !is.na(company$subind) ){
-                columns <- c(columns, "subind")
-                values <- c(values, enQuote(company$subind))
-            }
-            # Register to the company table
-            tryInsertOrReplace(conn, 
-                               "company", 
-                               columns, values)
-            logger.info(paste("Registered to the company table:", company$id, company$name))
-            # Create per-T series tables
-        dbSendQuery(conn, "COMMIT")
-                 logger.info(paste("[COMPANY] Committed", fsid))
-        }, error=function(msg){
-            logger.error(paste("Rolling back:", msg))
-            dbSendQuery(conn, "ROLLBACK")
-        })
-    }
     ########################################
     # Create fql-company tables
     ########################################
@@ -242,12 +157,49 @@ initTseriesDb <- function( conn, config) {
                              "FLOAT", 
                              "FLOAT")
     tseries.specs <- paste(tseries.column.name, tseries.column.type)    
+    
+    ########################################
+    # Create CATALOG tables
+    ########################################
+    catalog.column.name <- c("dbname",
+                             "tablename",
+                             "factset_id",
+                             "fql",
+                             "usd",
+                             "local",
+                             "earliest",
+                             "latest")
+    
+    catalog.column.type <- c("VARCHAR(30) NOT NULL",
+                             "VARCHAR(41) NOT NULL UNIQUE",
+                             "VARCHAR(20) NOT NULL",
+                             "VARCHAR(20) NOT NULL",
+                             "INTEGER",
+                             "INTEGER",
+                             "INTEGER",
+                             "INTEGER")
+    catalog.column.constraint <- c("PRIMARY KEY(factset_id, fql)",
+                                   "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
+                                   "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE NO ACTION ON UPDATE CASCADE")
+    catalog.specs <- c(paste(catalog.column.name, catalog.column.type), catalog.column.constraint)
+    #tryDrop(meta_conn, "catalog")
+    tryCreateTableIfNotExists(meta_conn, "catalog", catalog.specs)
+    logger.info(paste("Created CATALOG table:", paste(catalog.specs, collapse=",")))
+    tseries_dbpath_list <- c()
     for( fql in fql_list ){
-        
+
+        dbname <- paste(fql, ".sqlite", sep="")
+        db_filepath <- file.path(dbdir, dbname)
+        tseries_dbpath_list <- c(tseries_dbpath_list, db_filepath)
+        this_fql_dbconn <- dbConnect( SQLite(), db_filepath)
+        logger.info(paste("Connected to db:", db_filepath))
+       
+        ret <- trySelect(meta_conn, "fql", c("syntax"), c(paste("fql=",enQuote(fql))))
+        fql_syntax <- ret$syntax
+
         controls <- get(paste(fs_prefix, fql, sep=""), envir=config)
         curr_list <- c(tolower(default_currency))
-        freq_list <- c()
-        
+
         if( all("LOCAL" %in% controls) ) {
             if( default_currency != "LOCAL" ){
                 curr_list <- cbind(curr_list, "local")
@@ -258,121 +210,157 @@ initTseriesDb <- function( conn, config) {
                 curr_list <- cbind(curr_list, "usd")
             }
         }
+        
+        freq <- "Y"
         if( all("D" %in% controls) ) {
-            freq_list <- cbind(freq_list, "D")
+            freq <- "D"
+        } else if( all("M" %in% controls) ) {
+            freq <- "M"
+        } else if( all("Q" %in% controls) ) {
+            frqe <- "Q"
+        } else if( all("Y" %in% controls) ) {
+            freq <- "Y"
         }
-        if( all("M" %in% controls) ) {
-            freq_list <- cbind(freq_list, "M")
-        }
-        if( all("Q" %in% controls) ) {
-            freq_list <- cbind(freq_list, "Q")
-        }
-        if( all("Y" %in% controls) ) {
-            freq_list <- cbind(freq_list, "Y")
-        }
-        for( fsid in universe ){
-            trySendQuery(conn, "BEGIN")
+
+        UBINSIZE=50
+        for(ubegin in seq(1, length(universe), UBINSIZE ) ) {
+            uend <- min(ubegin+UBINSIZE-1, length(universe))
             
-            tablename <- paste(fql, fsid, sep="-")
-            
-            tryCreateTable(conn, tablename, tseries.specs)
-            logger.info(paste("Created tseries table:", tablename, tseries.specs))
-            
-            for( freq in freq_list ){
-                ret <- trySelect(conn, "fql", c("syntax"), c(paste("fql=",enQuote(fql))))
-                fql_syntax <- ret$syntax
+            page_str <- paste("[", ubegin, "-", uend, "]/", length(universe), sep="")           
+            mini_universe <- universe[ubegin:uend]
+            local_data <- NULL
+            usd_data <- NULL
+
+            for( curr in curr_list ){
+                data <- tryBulkExtract(fql_syntax, mini_universe, fs.t0, fs.t1, freq, curr)
+                if( is.empty(data) ){
+                    logger.warn(paste(page_str, ") No data:", fql, " ..., skipping..."))
+                    stop()
+                }
+                
+                if( curr == "usd" ){
+                    usd_data <- data
+                } else if( curr == "local" ){
+                    local_data <- data
+                }
+            }
+            if( is.empty(usd_data) && is.empty(local_data) ){
+                logger.error(paste(page_str, ") Extraction failed.  Skipping this bin:", fql_syntax, fs.t0, fs.t1, freq, paste(curr_list, ",")))
+                next
+            }
+
+            for( fsid in mini_universe ){           
                 master_data <- NULL
-                for( curr in curr_list ){
-                    fs_str2 <- paste(fs.t0, fs.t1, freq, sep=":")
-                    data <- tryExtract(fql_syntax, fsid, fs.t0, fs.t1, freq, curr)
-                    if( is.empty(data) ){
-                        logger.warn(paste("No data:", fsid, ",", fql, " ..., skipping..."))
-                        stop()
+                is_data_ready <- FALSE
+                tryCatch({  
+                    for( curr in curr_list ){
+                        if( curr == "local" && !is.empty(local_data) && fsid %in% colnames(local_data) ){
+                            data <- data.frame( rownames(local_data), local_data[[fsid]])
+                        } else if( curr == "usd" && !is.empty(usd_data) && fsid %in% colnames(usd_data) ){
+
+                            data <- data.frame( rownames(usd_data), usd_data[[fsid]])
+                        } else{
+                            logger.error(paste("Unsupported currency:", curr))
+                            next
+                        }
+                        colnames(data) <- c("date", curr)
+                        if( is.empty(master_data) ){
+                            master_data <- data
+                        } else {
+                            master_data <- merge(master_data, data, by=c("date"))
+                        }                
                     }
-                    
-                    colnames(data) <- c("id", "date", curr)
                     if( is.empty(master_data) ){
-                        master_data <- data
-                    } else {
-                        master_data <- merge(master_data, data, by=c("id", "date"))
-                    }                
-                }
-                if( is.empty(master_data) ){
-                    logger.warn(paste("No data from", t0, "to", t1, ":", fsid, ",", fql))
-                    next
-                }
-                filter <- vector("logical", nrow(master_data))
-                do_skip <- TRUE
-                for( j in seq(1,nrow(master_data)) ){
-                    if( all(is.na(master_data[j,][3:ncol(master_data)]) ) ){
-                        if(do_skip){
+                        logger.warn(paste("No data from", t0, "to", t1, ":", fsid, ",", fql))
+                        next
+                    }
+                    filter <- vector("logical", nrow(master_data))
+                    for( j in seq(1,nrow(master_data)) ){
+                        if( all(is.na(master_data[j,][2:ncol(master_data)]) ) ){
                             filter[j] <- FALSE
                         } else{
                             filter[j] <- TRUE
                         }
-                    } else{
-                        #do_skip <- FALSE
-                        filter[j] <- TRUE
                     }
-                }
-                        
-                filtered_data <- master_data[filter,]
-                if( is.empty(filtered_data) ){
-                    logger.warn(paste("No data after filtering out NULL from", t0, "to", t1, ":", fsid, ",", fql))
-                    next
-                }
-                tryCatch({
-                    as.Date(filtered_data[[2]])
-                }, warning=function(msg){
-                    logger.error(paste("Some date string must be mulformed:", filtered_data[[2]]))
-                    next
+                            
+                    filtered_data <- master_data[filter,]
+                    if( is.empty(filtered_data) ){
+                        logger.warn(paste("No data after filtering out NULL from", t0, "to", t1, ":", fsid, ",", fql))
+                        next
+                    }
+                    tryCatch({
+                        as.Date(filtered_data[[1]])
+                    }, warning=function(msg){
+                        logger.error(paste("Some date string must be mulformed:", filtered_data[[1]]))
+                        stop(msg)
+                    }, error=function(msg){
+                        logger.error(paste("Some date string must be mulformed:", filtered_data[[1]]))
+                        stop(msg)
+                    })
+                    is_data_ready <- TRUE
                 }, error=function(msg){
-                    logger.error(paste("Some date string must be mulformed:", filtered_data[[2]]))
-                    next
+                    logger.error(msg)
                 })
-                         
+                if( ! is_data_ready ) next
                 
-                # Populate the t-series table, chunk at a time
-                BINSIZE <- 100
-                for( begin in seq(1, nrow(filtered_data), BINSIZE) ){
-                    end <- min(nrow(filtered_data), begin+BINSIZE-1)
-                    values <- NULL
-                    if( ncol(filtered_data) > 3 ){
-                        values <- data.frame(julianday(as.Date(filtered_data[begin:end,][[2]])),
-                                        filtered_data[begin:end,][c(3,4)])
-                    } else {
-                        values <- data.frame(julianday(as.Date(filtered_data[begin:end,][[2]])),
-                                        filtered_data[begin:end,][c(3)])
-                    }
+                tryCatch({                    
+                    trySendQuery(this_fql_dbconn, "BEGIN")
+                    trySendQuery(meta_conn, "BEGIN")
                     
-                    tryBulkInsertOrReplace(conn, 
-                                       tablename, 
-                                       c("date", curr_list), 
-                                       values
+                    tablename <- paste(fql, fsid, sep="-")
+                    tryCreateTableIfNotExists(this_fql_dbconn, tablename, tseries.specs)
+                    logger.info(paste("Created tseries table:", tablename, paste(tseries.specs, collapse=",")))
+                    
+                    # Populate the t-series table, chunk at a time
+                    TSERIES_BINSIZE <- 100
+                    for( tbegin in seq(1, nrow(filtered_data), TSERIES_BINSIZE) ){
+                        tend <- min(nrow(filtered_data), tbegin+TSERIES_BINSIZE-1)
+                        values <- NULL
+                        if( ncol(filtered_data) > 2 ){
+                            values <- data.frame(julianday(as.Date(filtered_data[tbegin:tend,][[1]])),
+                                            filtered_data[tbegin:tend,][c(2,3)])
+                        } else {
+                            values <- data.frame(julianday(as.Date(filtered_data[tbegin:tend,][[1]])),
+                                            filtered_data[tbegin:tend,][c(2)])
+                        }
+                        
+                        tryBulkInsertOrReplace(this_fql_dbconn, 
+                                           tablename, 
+                                           c("date", curr_list), 
+                                           values
+                        )
+                    }
+                    # Register to catalog
+                    earliest <- julianday(as.Date(filtered_data[1,2]))
+                    latest <- julianday(as.Date(filtered_data[nrow(filtered_data),1]))
+                    columns <- c("dbname", "tablename","factset_id","fql","usd","local","earliest","latest")
+                    values <- data.frame(enQuote(dbname),
+                                         enQuote(tablename),
+                                         enQuote(c(fsid)),
+                                         enQuote(c(fql)),
+                                         c( ifelse( "usd" %in% curr_list, 1, 0) ),
+                                         c( ifelse( "local" %in% curr_list, 1, 0) ),
+                                         earliest,
+                                         latest
                     )
-                }
-                # Register to catalog
-                earliest <- julianday(as.Date(filtered_data[1,2]))
-                latest <- julianday(as.Date(filtered_data[nrow(filtered_data),2]))
-                columns <- c("tablename","factset_id","fql","usd","local","earliest","latest")
-                values <- data.frame(enQuote(tablename),
-                                     enQuote(c(fsid)),
-                                     enQuote(c(fql)),
-                                     c( ifelse( "usd" %in% curr_list, 1, 0) ),
-                                     c( ifelse( "local" %in% curr_list, 1, 0) ),
-                                     earliest,
-                                     latest
-                )
-                tryBulkInsert(conn, "catalog", columns, values)
-                logger.info(paste("Registered to CATALOG table:", fsid, ",", fql))
+                    tryBulkInsertOrReplace(meta_conn, "catalog", columns, values)
+                    logger.info(paste("Registered to CATALOG table:", fsid, ",", fql))
+        
+                    
+                    trySendQuery(this_fql_dbconn, "COMMIT")
+                    trySendQuery(meta_conn, "COMMIT")
+                    logger.info(paste("Commited on", fsid))
+                    
+                }, error=function(msg){
+                    logger.error(paste("Rolling back:", msg))
+                    trySendQuery(this_fql_dbconn, "ROLLBACK")
+                    trySendQuery(meta_conn, "ROLLBACK")
+                })
             }
-            dbSendQuery(conn, "COMMIT")
-            logger.info(paste("Commited on", fsid))
-        }, error=function(msg){
-            logger.error(paste("Rolling back:", msg))
-            dbSendQuery(conn, "ROLLBACK")
-        })
-    }
-    
-    return(0)
-}
+            
+        }
+        dbDisconnect(this_fql_dbconn)
+     }
+     
+     return(tseries_dbpath_list)
+ }

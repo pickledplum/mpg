@@ -1,21 +1,20 @@
 tryCatch({
+
     library(tools)
-    #library(FactSetOnDemand)
     library(xts)
-    #library(RSQLite)
     
     source("read_config.r")
     source("logger.r")
-    #source("tryDb.r")
     source("assert.r")
-    #source("tryExtract.r")
     source("is.empty.r")
     source("drop_tables.r")
-    #source("julianday.r")
     source("create_year_summary.r")
-    #source("enQuote.r")
     source("createMetaDb.r")
-    #source("initTseriesDb.r")
+    source("initTseriesDb.r")
+    source("createFreqTable.r")
+    source("createFqlTable.r")
+    source("createCategoryTable.r")
+    source("createCountryCompanyTables.r")
     
 }, warning=function(msg){
     print(msg)
@@ -28,11 +27,15 @@ tryCatch({
 #####################################
 # Constants
 #####################################
-db_name <- "frontier"
-db <- paste("/home/honda/sqlite-db/", db_name, ".sqlite", sep="")
-config_file <- paste("/home/honda/mpg/", db_name, ".conf", sep="")
+tag <- "mini"
+dbdir <- "/home/honda/sqlite-db"
 wkdir <- "/home/honda/sqlite-db"
-logfile_name <- paste(db_name, ".log", sep="")
+
+dbname <- paste(tag, ".sqlite", sep="")
+dbpath <- file.path(dbdir, dbname)
+config_file <- paste("/home/honda/mpg/", tag, ".conf", sep="")
+
+logfile_name <- paste(tag, ".log", sep="")
 do_stdout <- TRUE
 #####################################
 # Start...
@@ -66,29 +69,40 @@ print(paste("Log file:", logfile))
 #####################################
 # Open DB
 #####################################
-conn <<- dbConnect( SQLite(), db )
-logger.warn(paste("Opened SQLite database:", db))
+meta_conn <- dbConnect( SQLite(), dbpath )
+logger.warn(paste("Opened SQLite database:", dbpath))
 
 #####################################
 # Drop tables
 #####################################
-drop_tables(conn)
+#drop_tables(meta_conn, exclude=c("country", "company", "fql", "frequency"))
+#drop_tables(meta_conn)
 
 #####################################
 # Bulk init DB
 #####################################
-createMetaDb(conn, config)
-#initTseriesDb(conn, config)
+#createFreqTable(meta_conn)
+
+#stopifnot( exists("FQL_MAP", envir=config) )
+#fql_map_filename <- get("FQL_MAP", envir=config)
+#createFqlTable(meta_conn, fql_map_filename)
+
+#createCategoryTable(meta_conn)
+
+createCountryCompanyTables(meta_conn, config)
+
+tseries_dbname_list <- initTseriesDb(meta_conn, config, dbdir)
+logger.debug(paste("T-series dbs:", paste(tseries_dbname_list, collapse=",")))
 
 #####################################
-# Bulk init DB
+# Create WKCap summary table
 #####################################
-#create_year_summary(conn, "FF_WKCAP", do_drop=FALSE)
+create_year_summary(meta_conn, dbdir, "FF_WKCAP", do_drop=FALSE)
 
 #####################################
 # Close DB
 #####################################
-dbDisconnect(conn)
+dbDisconnect(meta_conn)
 logger.warn("Closed db")
 #####################################
 # Close Logger

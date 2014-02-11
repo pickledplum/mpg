@@ -23,7 +23,7 @@ tryCatch({
     stop()
 }
 )    
-createMetaDb <- function(conn, config) {
+createCountryCompanyTables <- function(conn, config) {
     
     ########################################
     # Configure FS
@@ -128,7 +128,7 @@ createMetaDb <- function(conn, config) {
                              "VARCHAR(25)" )
     country.specs <- paste(country.column.name, country.column.type)
     
-    tryCreateTable(conn, "country", country.specs)
+    tryCreateTableIfNotExists(conn, "country", country.specs)
     logger.info(paste("Created COUNTRY table:", paste(country.specs, collapse=",")))
     
     ########################################
@@ -150,96 +150,11 @@ createMetaDb <- function(conn, config) {
                              "VARCHAR(100)")
     company.column.constraint <- c("FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE")
     company.specs <- c(paste(company.column.name, company.column.type), company.column.constraint)
-    tryCreateTable(conn, "company", company.specs)
+    tryCreateTableIfNotExists(conn, "company", company.specs)
     logger.info(paste("Created COMPANY table:", paste(company.specs, collapse=",")))
-    
+      
     ########################################
-    # Create CATEGORY table
-    ########################################
-    category.column.name <- c("category_id", 
-                              "category_descript")
-    category.column.type <- c("VARCHAR(50) PRIMARY KEY NOT NULL UNIQUE", 
-                              "TEXT(50) NOT NULL UNIQUE")
-    category.specs <- paste(category.column.name, category.column.type)
-    tryCreateTable(conn, "category", category.specs)
-    logger.info("Created CATEGORY table")
-    
-    category.category_id <- c("company_fund", 
-                              "price", 
-                              "company_info", 
-                              "country_fund")
-    category.category_descript <- c("company fundamental",
-                                    "price",
-                                    "company info",
-                                    "country fundamental")
-    tryBulkInsertOrReplace(conn, "category", category.column.name, 
-                           data.frame(enQuote(category.category_id), 
-                                      enQuote(category.category_descript)))
-    logger.info(paste("Created CATEGORY table:", paste(category.specs, collapse=",")))
-    
-    ########################################
-    # Create FREQUENCY table
-    ########################################
-    frequency.column.name <- c("freq", 
-                               "freq_name")
-    
-    frequency.column.type <- c("VARCHAR(1) PRIMARY KEY NOT NULL UNIQUE",
-                               "VARCHAR(20) UNIQUE"
-    )
-    frequency.specs <- paste(frequency.column.name, frequency.column.type)
-    
-    tryCreateTable(conn, "frequency", frequency.specs)
-    logger.info("Created FREQUENCY table")
-    
-    tryBulkInsertOrReplace(conn, "frequency", 
-                           frequency.column.name, 
-                           data.frame(enQuote(c("Y","S","Q","M","D")),
-                                      enQuote(c("Anuual","Semiannual","Quarterly","Monthly","Daily"))) )
-    logger.info(paste("Created FREQUENCY table:", paste(frequency.specs, collapse=",")))
-    
-    ########################################
-    # Create FQL table
-    ########################################
-    fql.column.name <- c("fql", 
-                         "syntax", 
-                         "description", 
-                         "unit", 
-                         "report_freq",
-                         "category_id", 
-                         "note")
-    fql.column.type <- c("VARCHAR(20) PRIMARY KEY NOT NULL UNIQUE", 
-                         "TEXT(200)",
-                         "TEXT(100)", 
-                         "FLOAT", 
-                         "CHAR(1)", 
-                         "VARCHAR(50)",
-                         "VARCHAR(200)")
-    fql.column.constraint <-  c("FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
-                                "FOREIGN KEY(report_freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE")
-    
-    fql.specs <- c(paste(fql.column.name, fql.column.type), fql.column.constraint)
-    tryCreateTable(conn, "fql", fql.specs)
-    logger.info(paste("Created FQL table:", paste(fql.specs, collapse=",")))
-    
-    stopifnot( exists("FQL_MAP", envir=config) )
-    fql_map_filename <- get("FQL_MAP", envir=config)
-    stopifnot(file.exists(fql_map_filename))
-    fql_map <- read.csv(fql_map_filename)
-    rownames(fql_map) <- fql_map$fql
-    tryBulkInsert(conn, "fql", 
-                  fql.column.name,
-                  data.frame(enQuote2(fql_map$fql),
-                             enQuote2(fql_map$syntax),
-                             enQuote(fql_map$description),
-                             fql_map$unit,
-                             enQuote(fql_map$report_freq),
-                             enQuote(fql_map$category_id),
-                             enQuote(fql_map$note)
-                  ))
-    
-    logger.info(paste("Populated FQL table:", nrow(fql_map)))
-    ########################################
-    #  Create CATALOG table  
+    #  Company meta data  
     ########################################
     
     company.meta.fql <- c("FG_COMPANY_NAME",
@@ -272,27 +187,6 @@ createMetaDb <- function(conn, config) {
         "indgrp",
         "industry",
         "subind")
-    catalog.column.name <- c("tablename",
-                             "factset_id",
-                             "fql",
-                             "usd",
-                             "local",
-                             "earliest",
-                             "latest")
-    
-    catalog.column.type <- c("VARCHAR(41) NOT NULL UNIQUE",
-                             "VARCHAR(20) NOT NULL",
-                             "VARCHAR(20) NOT NULL",
-                             "INTEGER",
-                             "INTEGER",
-                             "INTEGER",
-                             "INTEGER")
-    catalog.column.constraint <- c("PRIMARY KEY(factset_id, fql)",
-                                   "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
-                                   "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE NO ACTION ON UPDATE CASCADE")
-    catalog.specs <- c(paste(catalog.column.name, catalog.column.type), catalog.column.constraint)
-    tryCreateTable(conn, "catalog", catalog.specs)
-    logger.info(paste("Created CATALOG table:", paste(catalog.specs, collapse=",")))
 
     BINSIZE = 100
     for( begin in seq(1, length(universe), BINSIZE )){
@@ -329,7 +223,7 @@ createMetaDb <- function(conn, config) {
                         country_id <- trySelect(conn, "country", c("country_id"), paste("country_id=",enQuote(company$country_id), sep=""))
                     
                         if( is.empty(country_id) ){
-                            tryInsert(conn,
+                            tryInsertOrReplace(conn,
                                       "country", 
                                       country.column.name, 
                                       c(enQuote(company$country_id),

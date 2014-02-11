@@ -20,8 +20,21 @@ tryCatch({
 }
 )
 
-create_year_summary <- function( conn, fql, do_drop=FALSE ){
-    #browser()
+create_year_summary <- function(meta_conn, dbdir, fql, do_drop=FALSE ){
+
+    ########################################
+    # Collect all the market values by year
+    ########################################
+
+    # collect table names from CATALOG table
+    #SELECT factset_id, tablename, usd, earliest, latest FROM catalog
+    print(dbGetQuery(meta_conn, "SELECT * FROM sqlite_master"))
+    catalog_ret <- trySelect(meta_conn, 
+                           "catalog", 
+                            c("factset_id", "dbname", "tablename", "usd", "earliest", "latest"),
+                            c(paste("fql=", enQuote(fql),sep="")),
+                           TRUE)
+    
     ########################################
     # Create summary table
     ########################################
@@ -32,25 +45,15 @@ create_year_summary <- function( conn, fql, do_drop=FALSE ){
     specs <- c("factset_id VARCHAR(20)",
                years_spec)
     
-    tryDrop(conn, summary_tablename)
-    tryCreateTableIfNotExists(conn, summary_tablename, specs)
+    tryDrop(meta_conn, summary_tablename)
+    tryCreateTableIfNotExists(meta_conn, summary_tablename, specs)
     logger.info(paste("Created table:", summary_tablename))
-    ########################################
-    # Collect all the market values by year
-    ########################################
-
-    # collect table names from CATALOG table
-    #SELECT factset_id, tablename, usd, earliest, latest FROM catalog
-    catalog_ret <- trySelect(conn, 
-                           "catalog", 
-                            c("factset_id", "tablename", "usd", "earliest", "latest"),
-                            c(paste("fql=", enQuote(fql),sep="")),
-                           TRUE)
     
     julian_yearends <- julianday(yearends)
     for( i in seq(1, nrow(catalog_ret)) ){
         attributes <- catalog_ret[i,]
         fsid <- attributes$factset_id
+        dbname <- attributes$dbname
         tablename <- attributes$tablename
         has_value <- attributes$usd
         julianday_earliest_data_on <- attributes$earliest
@@ -71,6 +74,9 @@ create_year_summary <- function( conn, fql, do_drop=FALSE ){
         julian_yearstarts <- julianday(seq(earliest_year0101, latest_year0101, by="year"))
         julian_yearends <- julianday(seq(earliest_year1231, latest_year1231, by="year"))
         
+        dbpath <- file.path(dbdir, dbname)
+        tseries_dbconn <- dbConnect(SQLite(), dbpath)
+        
         q_str <- ""
         for( k in seq(1, length(julian_yearstarts) ) ){
             if( k > 1 ){
@@ -82,29 +88,40 @@ create_year_summary <- function( conn, fql, do_drop=FALSE ){
             logger.debug(q0_str)
             q_str <- paste(q_str, q0_str)
         }
-        r <- tryGetQuery(conn, q_str)
+        r <- tryGetQuery(tseries_dbconn, q_str)
         
-        valid_years <- seq(earliest_year, latest_year, by=1)
+
+        valid_years <- year(r$date)
         valid_vals <- r$usd
 
-        if(is.empty(valid_vals) || all(is.na(valid_vals)) ){
+        toremove <- which(is.na(valid_vals))
+        if( !is.empty(toremove) ){
+            valid_years <- valid_years[-toremove]
+            valid_vals <- valid_vals[-toremove]
+        }
+        if(is.empty(valid_vals) ){
             logger.warn(paste("Empty table:", tablename))
             next
         }
-
-        if( any(is.na(r$usd)) || any(is.null(r$usd)) ) {
-            
-            toremove <- which(r$usd=="NA")
-            valid_years <- valid_years[-toremove]
-            valid_vals <- r$usd[-toremove]
-        }
-       
-        tryInsert(conn, 
+        
+        tryInsertOrReplace(meta_conn, 
                   summary_tablename, 
-                  cbind("factset_id", valid_years),
-                  cbind(enQuote(fsid), valid_vals)
+                  c("factset_id", valid_years),
+                  c(enQuote(fsid), valid_vals)
         )
     }
     logger.info(paste("Populated table:", summary_tablename))
     return(0)
+}
+year <- function( date_list ){
+    years <- c()
+    for( date in date_list ){
+        if( class(date) == "Date" ){
+            date <- as.character(date)
+        }
+        tokens <- strsplit(date, "-")
+        years <- c(years, tokens[[1]][1])
+    }
+    return(years)
+    
 }
