@@ -20,12 +20,11 @@ tryCatch({
 }
 )
 
-create_year_summary <- function(dbdir, metadb, fql, do_drop=FALSE ){
+create_year_summary <- function(meta_dbpath, fql, do_drop=FALSE ){
     
-    dbpath <- file.path(dbdir, metadb)
-    meta_conn <- dbConnect( SQLite(), dbpath )
-    logger.warn(paste("Opened SQLite database:", dbpath))
-    #on.exit(dbDisconnect(meta_conn))
+    dbdir <- extractDirFromPath(meta_dbpath)
+    meta_conn <- dbConnect( SQLite(), meta_dbpath )
+    logger.warn(paste("Opened SQLite database:", meta_dbpath))
             
     ########################################
     # Collect all the market values by year
@@ -94,7 +93,6 @@ create_year_summary <- function(dbdir, metadb, fql, do_drop=FALSE ){
             q_str <- paste(q_str, q0_str)
         }
         r <- tryGetQuery(tseries_dbconn, q_str)
-        dbDisconnect(tseries_dbconn)
 
         valid_years <- year(r$date)
         valid_vals <- r$usd
@@ -114,6 +112,15 @@ create_year_summary <- function(dbdir, metadb, fql, do_drop=FALSE ){
                   c("factset_id", valid_years),
                   c(enQuote(fsid), valid_vals)
         )
+        
+        for( pending_result in dbListResults(tseries_dbconn) ){
+            dbClearResult(pending_result)
+        }
+        dbDisconnect(tseries_dbconn)
+    }
+    
+    for( pending_result in dbListResults(meta_conn) ){
+        dbClearResult(pending_result)
     }
     dbDisconnect(meta_conn)
     

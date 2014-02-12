@@ -27,9 +27,14 @@ tryCatch({
 # Constants
 #####################################
 tag <- "test-frontier"
-dbdir <- "/home/honda/sqlite-db"
+dbdir <- file.path("/home/honda/sqlite-db", tag)
+if( !file.exists(dbdir) ){
+    dir.create(dbdir)
+}
 wkdir <- dbdir
-
+if( !file.exists(wkdir) ){
+    dir.create(dbdir)
+}
 dbname <- paste(tag, ".sqlite", sep="")
 dbpath <- file.path(dbdir, dbname)
 config_file <- paste("/home/honda/mpg/", tag, ".conf", sep="")
@@ -90,19 +95,22 @@ createCategoryTable(meta_conn)
 
 createCountryCompanyTables(meta_conn, config)
 
-tseries_dbname_list <- initTseriesDb(meta_conn, config, dbdir)
+tseries_dbname_list <- initTseriesDb(meta_conn, config)
 logger.debug(paste("T-series dbs:", paste(tseries_dbname_list, collapse=",")))
 
 #####################################
 # Close DB
 #####################################
+for( pending_result in dbListResults(meta_conn) ){
+    dbClearResult(pending_result)
+}
 dbDisconnect(meta_conn)
 logger.warn("Closed db")
 
 #####################################
 # Create WKCap summary table
 #####################################
-create_year_summary(dbdir, dbname, "FF_WKCAP", do_drop=TRUE)
+create_year_summary(dbpath, "FF_WKCAP", do_drop=TRUE)
 
 
 #####################################

@@ -13,6 +13,7 @@ tryCatch({
     source("drop_tables.r")
     source("julianday.r")
     source("enQuote.r")
+    source("extractDirFromPath.r")
     
 }, warning=function(msg){
     print(msg)
@@ -23,7 +24,9 @@ tryCatch({
 }
 ) 
 
-initTseriesDb <- function(meta_conn, config, dbdir) {
+initTseriesDb <- function(meta_conn, config) {
+    
+    dbdir <- extractDBDirFromPath(meta_conn)
 
     ########################################
     # Configure FS
