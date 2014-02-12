@@ -23,7 +23,7 @@ tryCatch({
     stop()
 }
 )    
-createdb <- function( conn, config) {
+updatedb <- function(meta_conn, dbdir, config) {
     
     ########################################
     # Configure FS
@@ -126,7 +126,7 @@ createdb <- function( conn, config) {
                              "VARCHAR(25)" )
     country.specs <- paste(country.column.name, country.column.type)
     
-    country.row1 <- trySelect(conn, "country", c("*"), c("rowid==1"))
+    country.row1 <- trySelect(meta_db, "country", c("*"), c("rowid==1"))
     if( !all(intersect(colnames(country.row1), country.column.name) == country.column.name) ){
         logger.error(paste("Schema mismatch (COUNTRY table): expecting (", paste(counry.column.name, collapse=","), ")"))
         stop()
@@ -152,7 +152,7 @@ createdb <- function( conn, config) {
                              "VARCHAR(100)")
     company.column.constraint <- c("FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE")
     company.specs <- c(paste(company.column.name, company.column.type), company.column.constraint)
-    company.row1 <- trySelect(conn, "company", c("*"), c("rowid==1"))
+    company.row1 <- trySelect(meta_db, "company", c("*"), c("rowid==1"))
     if( !all(intersect(colnames(company.row1), company.column.name) == company.column.name) ){
         logger.error(paste("Schema mismatch (COMPANY table): expecting (", paste(company.column.name, collapse=","), ")"))
         stop()
@@ -167,7 +167,7 @@ createdb <- function( conn, config) {
     category.column.type <- c("VARCHAR(50) PRIMARY KEY NOT NULL UNIQUE", 
                               "TEXT(50) NOT NULL UNIQUE")
     category.specs <- paste(category.column.name, category.column.type)
-    category.row1 <- trySelect(conn, "category", c("*"), c("rowid==1"))
+    category.row1 <- trySelect(meta_db, "category", c("*"), c("rowid==1"))
     if( !all(intersect(colnames(category.row1), category.column.name) == category.column.name) ){
         logger.error(paste("Schema mismatch (CATEGORY table): expecting (", paste(category.column.name, collapse=","), ")"))
         stop()
@@ -185,7 +185,7 @@ createdb <- function( conn, config) {
     )
     frequency.specs <- paste(frequency.column.name, frequency.column.type)
     
-    frequency.row1 <- trySelect(conn, "frequency", c("*"), c("rowid==1"))
+    frequency.row1 <- trySelect(meta_db, "frequency", c("*"), c("rowid==1"))
     if( !all(intersect(colnames(frequency.row1), frequency.column.name) == frequency.column.name) ){
         logger.error(paste("Schema mismatch (FREQUENCY table): expecting (", paste(frequency.column.name, collapse=","), ")"))
         stop()
@@ -213,7 +213,7 @@ createdb <- function( conn, config) {
                                 "FOREIGN KEY(report_freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE")
     
     fql.specs <- c(paste(fql.column.name, fql.column.type), fql.column.constraint)
-    fql.row1 <- trySelect(conn, "fql", c("*"), c("rowid==1"))
+    fql.row1 <- trySelect(meta_db, "fql", c("*"), c("rowid==1"))
     if( !all(intersect(colnames(fql.row1), fql.column.name) == fql.column.name) ){
         logger.error(paste("Schema mismatch (FQL table): expecting (", paste(fql.column.name, collapse=","), ")"))
         stop()
@@ -225,7 +225,7 @@ createdb <- function( conn, config) {
 #     stopifnot(file.exists(fql_map_filename))
 #     fql_map <- read.csv(fql_map_filename)
 #     rownames(fql_map) <- fql_map$fql
-#     tryBulkInsert(conn, "fql", 
+#     tryBulkInsert(meta_db, "fql", 
 #                   fql.column.name,
 #                   data.frame(enQuote2(fql_map$fql),
 #                              enQuote2(fql_map$syntax),
@@ -291,7 +291,7 @@ createdb <- function( conn, config) {
                                    "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
                                    "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE NO ACTION ON UPDATE CASCADE")
     catalog.specs <- c(paste(catalog.column.name, catalog.column.type), catalog.column.constraint)
-    catalog.row1 <- trySelect(conn, "catalog", c("*"), c("rowid==1"))
+    catalog.row1 <- trySelect(meta_db, "catalog", c("*"), c("rowid==1"))
     if( !all(intersect(colnames(catalog.row1), catalog.column.name) == catalog.column.name) ){
         logger.error(paste("Schema mismatch (CATALOG table): expecting (", paste(catalog.column.name, collapse=","), ")"))
         stop()
@@ -311,9 +311,9 @@ createdb <- function( conn, config) {
     for( fsid in universe ) {
         
         tryCatch({
-            dbSendQuery(conn, "BEGIN")
+            dbSendQuery(meta_db, "BEGIN")
             #check if the company is registered in Company table
-            company.table.data <- trySelect(conn, "company", company.column.name, paste("factset_id=", enQuote(fsid), sep=""))
+            company.table.data <- trySelect(meta_db, "company", company.column.name, paste("factset_id=", enQuote(fsid), sep=""))
             if( !is.empty(company.table.data) ){
                 logger.info(paste("Company already registered:", fsid))
             } else {
@@ -331,9 +331,9 @@ createdb <- function( conn, config) {
                 # Extract country info and register to the country table
                 
                 # See if the country is already registered
-                country_id <- trySelect(conn, "country", c("country_id"), paste("country_id=",enQuote(company$country_id), sep=""))
+                country_id <- trySelect(meta_db, "country", c("country_id"), paste("country_id=",enQuote(company$country_id), sep=""))
                 if( is.empty(country_id) ){
-                    tryInsert(conn,
+                    tryInsert(meta_db,
                               "country", 
                               country.column.name, 
                               c(enQuote(company$country_id),
@@ -387,23 +387,23 @@ createdb <- function( conn, config) {
                     values <- c(values, enQuote(company$subind))
                 }
                 # Register to the company table
-                tryInsertOrReplace(conn, 
+                tryInsertOrReplace(meta_db, 
                                    "company", 
                                    columns, values)
                 logger.info(paste("Registered to the company table:", company$id, company$name))
             }
-            dbSendQuery(conn, "COMMIT")
+            dbSendQuery(meta_db, "COMMIT")
             logger.info(paste("Commited COUNTRY and COMPANY tables for", fsid))
         }, error=function(msg){
                 logger.error(paste("Rolling back:", msg))
-                dbSendQuery(conn, "ROLLBACK")
+                dbSendQuery(meta_db, "ROLLBACK")
         })
 
         tryCatch({
             # T series tables
             for( fql in fql_list ){
-                dbSendQuery(conn, "BEGIN")
-                catalog.entry <- trySelect(conn, 
+                dbSendQuery(meta_db, "BEGIN")
+                catalog.entry <- trySelect(meta_db, 
                                            "catalog", 
                                            catalog.column.name, 
                                            paste("fql=", enQuote(fql), " AND factset_id=", enQuote(fsid), sep=""))
@@ -415,7 +415,7 @@ createdb <- function( conn, config) {
                     is_new_entry <- TRUE
                     tablename <- paste(fql, fsid, sep="-")
                     
-                    tryCreateTable(conn, tablename, tseries.specs)
+                    tryCreateTable(meta_db, tablename, tseries.specs)
                     logger.info(paste("Created tseries table:", tablename, tseries.specs))
                 } else {
                     # update fs.t0, fs.t1 and t0, t1
@@ -453,7 +453,7 @@ createdb <- function( conn, config) {
                 if( all("Y" %in% controls) ) {
                     freq <- "Y"
                 }
-                ret <- trySelect(conn, "fql", c("syntax"), c(paste("fql=",enQuote(fql))))
+                ret <- trySelect(meta_db, "fql", c("syntax"), c(paste("fql=",enQuote(fql))))
                 fql_syntax <- ret$syntax
                 master_data <- NULL
                 for( curr in curr_list ){
@@ -520,7 +520,7 @@ createdb <- function( conn, config) {
                                              filtered_data[begin:end,][c(3)])
                     }
                     
-                    tryBulkInsertOrReplace(conn, 
+                    tryBulkInsertOrReplace(meta_db, 
                                            tablename, 
                                            c("date", curr_list), 
                                            values
@@ -540,7 +540,7 @@ createdb <- function( conn, config) {
                                 earliest,
                                 latest
                     )
-                    tryInsertOrReplace(conn, 
+                    tryInsertOrReplace(meta_db, 
                               "catalog", 
                               catalog.column.name, 
                               values)
@@ -550,7 +550,7 @@ createdb <- function( conn, config) {
                                 c( ifelse( "local" %in% curr_list && catalog.entry$local==0, 1, 0) ),
                                 earliest,
                                 latest)
-                    tryUpdate(conn, 
+                    tryUpdate(meta_db, 
                               "catalog", 
                               "tablename", 
                               enQuote(tablename), 
@@ -558,14 +558,14 @@ createdb <- function( conn, config) {
                               values)
                     logger.info(paste("Updated the entry in CATALOG table:", fsid, ",", fql))
                 }
-                dbSendQuery(conn, "COMMIT")
+                dbSendQuery(meta_db, "COMMIT")
                 logger.info(paste("Commited on", fsid))
 
             }
             
         }, error=function(msg){
             logger.error(paste("Rolling back:", msg))
-            dbSendQuery(conn, "ROLLBACK")
+            dbSendQuery(meta_db, "ROLLBACK")
         })
         
     }
@@ -575,11 +575,15 @@ createdb <- function( conn, config) {
 #####################################
 # Constants
 #####################################
-db_name <- "mini"
-db <- paste("/Users/honda/db/", db_name, ".sqlite", sep="")
-config_file <- paste("/Users/honda/Documents/GitHub/mpg/", db_name, ".conf", sep="")
-wkdir <- "/Users/honda/db"
-logfile_name <- paste(db_name, ".log", sep="")
+tag <- "mini"
+dbdir <- "/home/honda/sqlite-db"
+wkdir <- dbdir
+
+dbname <- paste(tag, ".sqlite", sep="")
+dbpath <- file.path(dbdir, dbname)
+config_file <- paste("/home/honda/mpg/", tag, ".conf", sep="")
+
+logfile_name <- paste(tag, ".log", sep="")
 do_stdout <- TRUE
 #####################################
 # Start...
@@ -613,8 +617,8 @@ print(paste("Log file:", logfile))
 #####################################
 # Open DB
 #####################################
-conn <<- dbConnect( SQLite(), db )
-logger.warn(paste("Opened SQLite database:", db))
+meta_db <<- dbConnect( SQLite(), dbpath )
+logger.warn(paste("Opened SQLite database:", dbpath))
 
 #####################################
 # Drop tables
@@ -623,8 +627,7 @@ logger.warn(paste("Opened SQLite database:", db))
 
 #####################################
 # Bulk init DB
-#####################################
-createdb(conn, config)
+updatedb(conn, config)
 
 #####################################
 # Bulk init DB

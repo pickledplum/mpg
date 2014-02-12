@@ -26,7 +26,7 @@ tryCatch({
 #####################################
 # Constants
 #####################################
-tag <- "mini"
+tag <- "test-frontier"
 dbdir <- "/home/honda/sqlite-db"
 wkdir <- dbdir
 
@@ -74,19 +74,19 @@ logger.warn(paste("Opened SQLite database:", dbpath))
 #####################################
 # Drop tables
 #####################################
-drop_tables(meta_conn, exclude=c("category", "fql", "frequency"))
-#drop_tables(meta_conn)
+#drop_tables(meta_conn, exclude=c("category", "fql", "frequency"))
+drop_tables(meta_conn)
 
 #####################################
 # Bulk init DB
 #####################################
-#createFreqTable(meta_conn)
+createFreqTable(meta_conn)
 
-#stopifnot( exists("FQL_MAP", envir=config) )
-#fql_map_filename <- get("FQL_MAP", envir=config)
-#createFqlTable(meta_conn, fql_map_filename)
+stopifnot( exists("FQL_MAP", envir=config) )
+fql_map_filename <- get("FQL_MAP", envir=config)
+createFqlTable(meta_conn, fql_map_filename)
 
-#createCategoryTable(meta_conn)
+createCategoryTable(meta_conn)
 
 createCountryCompanyTables(meta_conn, config)
 

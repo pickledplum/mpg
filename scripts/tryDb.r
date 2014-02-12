@@ -8,6 +8,7 @@
 library(RSQLite)
 source("logger.r")
 source("enQuote.r")
+source("na2null.r")
 
 #' Maxinum number of failures allowed before bailing out
 MAX_FAILURES = 5
@@ -143,6 +144,8 @@ tryBulkInsertOrUpdate <- function(conn, tablename, keyname, columns, values, max
 
 trySendQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
     logger.debug(q_str)
+    q_str <- na2null(q_str)
+    logger.debug(q_str)
     for( nfailure in seq(1, max_failures)) {
         tryCatch({
             dbSendQuery(conn, q_str)
@@ -160,6 +163,8 @@ trySendQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
     return(TRUE)
 }
 tryGetQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
+    logger.debug(q_str)
+    q_str <- na2null(q_str)
     logger.debug(q_str)
     ret <- NULL
     for( nfailure in seq(1, max_failures)) {
