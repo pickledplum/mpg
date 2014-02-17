@@ -1,3 +1,0 @@
-# ACWI ETF
-# Daily data
-P_TOTAL_RETURNC=D
