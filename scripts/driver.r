@@ -26,7 +26,7 @@ tryCatch({
 #####################################
 # Constants
 #####################################
-tag <- "test-frontier"
+tag <- "developed"
 dbdir <- file.path("/home/honda/sqlite-db", tag)
 if( !file.exists(dbdir) ){
     dir.create(dbdir)
@@ -64,7 +64,7 @@ stopifnot( file.exists(wkdir) )
 # Open Logger
 #####################################
 logfile <- file.path(wkdir, logfile_name)
-logger.init(level=logger.DEBUG,
+logger.init(level=logger.INFO,
             do_stdout=do_stdout,
             logfile=logfile)
 
@@ -80,20 +80,19 @@ logger.warn(paste("Opened SQLite database:", dbpath))
 # Drop tables
 #####################################
 #drop_tables(meta_conn, exclude=c("category", "fql", "frequency"))
-drop_tables(meta_conn)
+#drop_tables(meta_conn)
 
 #####################################
 # Bulk init DB
 #####################################
-createFreqTable(meta_conn)
+#createFreqTable(meta_conn)
 
-stopifnot( exists("FQL_MAP", envir=config) )
-fql_map_filename <- get("FQL_MAP", envir=config)
-createFqlTable(meta_conn, fql_map_filename)
+#stopifnot( exists("FQL_MAP", envir=config) )
+#fql_map_filename <- get("FQL_MAP", envir=config)
+#createFqlTable(meta_conn, fql_map_filename)
+#createCategoryTable(meta_conn)
 
-createCategoryTable(meta_conn)
-
-createCountryCompanyTables(meta_conn, config)
+#createCountryCompanyTables(meta_conn, config)
 
 tseries_dbname_list <- initTseriesDb(meta_conn, config)
 logger.debug(paste("T-series dbs:", paste(tseries_dbname_list, collapse=",")))
@@ -110,7 +109,7 @@ logger.warn("Closed db")
 #####################################
 # Create WKCap summary table
 #####################################
-create_year_summary(dbpath, "FF_WKCAP", do_drop=TRUE)
+#create_year_summary(dbpath, "FF_WKCAP", do_drop=FALSE)
 
 
 #####################################

@@ -32,7 +32,7 @@ logger.debug <- function(msg){
     logger.logmsg(logger.DEBUG, msg)
 }
 logger.logmsg <- function(level, msg){
-    t <- format(Sys.time(), "%H:%M:%S")
+    t <- format(Sys.time(), "%Y/%m/%d %H:%M:%S")
     level_str <- ""
     if( level==logger.DEBUG ){
         level_str <-"DEBUG"

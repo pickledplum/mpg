@@ -143,7 +143,7 @@ tryBulkInsertOrUpdate <- function(conn, tablename, keyname, columns, values, max
 }
 
 trySendQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
-    logger.debug(q_str)
+
     q_str <- na2null(q_str)
     logger.debug(q_str)
     for( nfailure in seq(1, max_failures)) {
@@ -163,7 +163,7 @@ trySendQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
     return(TRUE)
 }
 tryGetQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
-    logger.debug(q_str)
+
     q_str <- na2null(q_str)
     logger.debug(q_str)
     ret <- NULL

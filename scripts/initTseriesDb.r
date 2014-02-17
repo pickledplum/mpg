@@ -189,6 +189,31 @@ initTseriesDb <- function(meta_conn, config) {
     tryCreateTableIfNotExists(meta_conn, "catalog", catalog.specs)
     logger.info(paste("Created CATALOG table:", paste(catalog.specs, collapse=",")))
     tseries_dbpath_list <- c()
+    
+    # Remember objs to keep so far
+    keep1 <- c("dbdir", 
+               "t0", 
+               "fs.t0", 
+               "t1", 
+               "fs.t1", 
+               "default_currency",
+               "finance.index", 
+               "universe", 
+               "fs_prefix", 
+               "fql_list",
+               "country.column.name", 
+               "company.column.name", 
+               "fql.column.name", 
+               "catalog.column.name", 
+               "tseries.column.name",
+               "tseries.column.type", 
+               "tseries.specs", 
+               "catalog.column.name", 
+               "catalog.column.type", 
+               "catalog.column.constraint",
+               "catalog.specs", 
+               "tseries_dbpath_list")
+    
     for( fql in fql_list ){
 
         dbname <- paste(fql, ".sqlite", sep="")
@@ -199,7 +224,8 @@ initTseriesDb <- function(meta_conn, config) {
        
         ret <- trySelect(meta_conn, "fql", c("syntax"), c(paste("fql=",enQuote(fql))))
         fql_syntax <- ret$syntax
-
+        #dbClearResult(ret)
+        
         controls <- get(paste(fs_prefix, fql, sep=""), envir=config)
         curr_list <- c(tolower(default_currency))
 
@@ -225,6 +251,14 @@ initTseriesDb <- function(meta_conn, config) {
             freq <- "Y"
         }
 
+        # Objs to keep in the FQL params loop
+        keep2 <- c("dbname", 
+                   "fql_syntax", 
+                   "controls", 
+                   "curr_list", 
+                   "freq")
+        
+        i_fsid <- 1
         UBINSIZE=50
         for(ubegin in seq(1, length(universe), UBINSIZE ) ) {
             uend <- min(ubegin+UBINSIZE-1, length(universe))
@@ -235,20 +269,26 @@ initTseriesDb <- function(meta_conn, config) {
             usd_data <- NULL
 
             for( curr in curr_list ){
-                data <- tryBulkExtract(fql_syntax, mini_universe, fs.t0, fs.t1, freq, curr)
-                if( is.empty(data) ){
+                # the list of data frames.  Each frame has three columns ("Id", "Date", fsid)
+                data_list <- tryBulkExtract(fql_syntax, mini_universe, fs.t0, fs.t1, freq, curr)
+                if( is.empty(data_list) ){
                     logger.warn(paste(page_str, ") No data:", fql, " ..., skipping..."))
-                    stop()
+                    #browser()
+                    next
                 }
                 
                 if( curr == "usd" ){
-                    usd_data <- data
+                    usd_data <- data_list
                 } else if( curr == "local" ){
-                    local_data <- data
+                    local_data <- data_list
+                } else{
+                    #browser()
+                    stop(paste("Unsupported currency:", curr))
                 }
             }
             if( is.empty(usd_data) && is.empty(local_data) ){
-                logger.error(paste(page_str, ") Extraction failed.  Skipping this bin:", fql_syntax, fs.t0, fs.t1, freq, paste(curr_list, ",")))
+                logger.error(paste(page_str, ") Extraction failed.  Skipping this bin:", 
+                                   fql_syntax, fs.t0, fs.t1, freq, paste(curr_list, ",")))
                 next
             }
 
@@ -257,21 +297,28 @@ initTseriesDb <- function(meta_conn, config) {
                 is_data_ready <- FALSE
                 tryCatch({  
                     for( curr in curr_list ){
-                        if( curr == "local" && !is.empty(local_data) && fsid %in% colnames(local_data) ){
-                            data <- data.frame( rownames(local_data), local_data[[fsid]])
-                        } else if( curr == "usd" && !is.empty(usd_data) && fsid %in% colnames(usd_data) ){
-
-                            data <- data.frame( rownames(usd_data), usd_data[[fsid]])
+                        if( curr == "local" ){
+                            if( !is.empty(local_data) && fsid %in% names(local_data) ){
+                                data <- local_data[[fsid]]
+                            } else{
+                                logger.warn(paste("No local data for", fsid))
+                            }
+                        } else if( curr == "usd" ){
+                            if( !is.empty(usd_data) && fsid %in% names(usd_data) ){
+                                data <- usd_data[[fsid]]
+                            } else{
+                                logger.warn(paste("No USD data for", fsid))
+                            }
                         } else{
-                            logger.error(paste("Unsupported currency:", curr))
+                            logger.error(paste("Unsupported currency: [", curr, "]", sep=""))
                             next
                         }
-                        colnames(data) <- c("date", curr)
+                        colnames(data) <- c("id", "date", curr)
                         if( is.empty(master_data) ){
                             master_data <- data
                         } else {
-                            master_data <- merge(master_data, data, by=c("date"))
-                        }                
+                            master_data <- merge(master_data, data, by=c("id", "date"))
+                        }   
                     }
                     if( is.empty(master_data) ){
                         logger.warn(paste("No data from", t0, "to", t1, ":", fsid, ",", fql))
@@ -279,7 +326,7 @@ initTseriesDb <- function(meta_conn, config) {
                     }
                     filter <- vector("logical", nrow(master_data))
                     for( j in seq(1,nrow(master_data)) ){
-                        if( all(is.na(master_data[j,][2:ncol(master_data)]) ) ){
+                        if( all(is.na(master_data[j,][3:ncol(master_data)]) ) ){
                             filter[j] <- FALSE
                         } else{
                             filter[j] <- TRUE
@@ -292,18 +339,21 @@ initTseriesDb <- function(meta_conn, config) {
                         next
                     }
                     tryCatch({
-                        as.Date(filtered_data[[1]])
+                        as.Date(filtered_data[[2]])
                     }, warning=function(msg){
-                        logger.error(paste("Some date string must be mulformed:", filtered_data[[1]]))
+                        browser()
+                        logger.error(paste("Some date string must be mulformed:", filtered_data[[2]]))
                         stop(msg)
                     }, error=function(msg){
-                        logger.error(paste("Some date string must be mulformed:", filtered_data[[1]]))
+                        browser()
+                        logger.error(paste("Some date string must be mulformed:", filtered_data[[2]]))
                         stop(msg)
                     })
                     is_data_ready <- TRUE
                 }, error=function(msg){
                     logger.error(msg)
                 })
+                
                 if( ! is_data_ready ) next
                 
                 tryCatch({                    
@@ -319,12 +369,12 @@ initTseriesDb <- function(meta_conn, config) {
                     for( tbegin in seq(1, nrow(filtered_data), TSERIES_BINSIZE) ){
                         tend <- min(nrow(filtered_data), tbegin+TSERIES_BINSIZE-1)
                         values <- NULL
-                        if( ncol(filtered_data) > 2 ){
-                            values <- data.frame(julianday(as.Date(filtered_data[tbegin:tend,][[1]])),
-                                            filtered_data[tbegin:tend,][c(2,3)])
+                        if( ncol(filtered_data) > 3 ){
+                            values <- data.frame(julianday(as.Date(filtered_data[tbegin:tend,][[2]])),
+                                            filtered_data[tbegin:tend,][c(3,4)])
                         } else {
-                            values <- data.frame(julianday(as.Date(filtered_data[tbegin:tend,][[1]])),
-                                            filtered_data[tbegin:tend,][c(2)])
+                            values <- data.frame(julianday(as.Date(filtered_data[tbegin:tend,][[2]])),
+                                            filtered_data[tbegin:tend,][c(3)])
                         }
                         
                         tryBulkInsertOrReplace(this_fql_dbconn, 
@@ -333,9 +383,11 @@ initTseriesDb <- function(meta_conn, config) {
                                            values
                         )
                     }
+                    
                     # Register to catalog
+
                     earliest <- julianday(as.Date(filtered_data[1,2]))
-                    latest <- julianday(as.Date(filtered_data[nrow(filtered_data),1]))
+                    latest <- julianday(as.Date(filtered_data[nrow(filtered_data),2]))
                     columns <- c("dbname", "tablename","factset_id","fql","usd","local","earliest","latest")
                     values <- data.frame(enQuote(dbname),
                                          enQuote(tablename),
@@ -352,17 +404,27 @@ initTseriesDb <- function(meta_conn, config) {
                     
                     trySendQuery(this_fql_dbconn, "COMMIT")
                     trySendQuery(meta_conn, "COMMIT")
-                    logger.info(paste("Commited on", fsid))
+                    logger.info(paste("Commited on", fsid, "(", i_fsid, "/", length(universe), ")"))
                     
                 }, error=function(msg){
                     logger.error(paste("Rolling back:", msg))
                     trySendQuery(this_fql_dbconn, "ROLLBACK")
                     trySendQuery(meta_conn, "ROLLBACK")
-                })
+                }, finally = function(){
+                    to_remove <- ls()
+                    
+                }
+                )
+                i_fsid <- i_fsid+1
             }
-            
+        }
+        for(pending_result in dbListResults(this_fql_dbconn)){
+            dbClearResult(pending_result)
         }
         dbDisconnect(this_fql_dbconn)
+        all_objs <- ls()
+        to_remove <- all_objs[-which(c(all_objs %in% c(keep1, keep2)))]
+        remove(to_remove)
      }
      
      return(tseries_dbpath_list)
