@@ -1,6 +1,6 @@
 library(RSQLite)
 
-drop_tables <- function(conn, exclude=c()){
+dropTables <- function(conn, exclude=c()){
     
     table_list <- dbGetQuery(conn, "SELECT name FROM sqlite_master WHERE type='table' AND name<>'sqlite_sequence'")
     if( is.empty(table_list ) ){

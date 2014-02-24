@@ -4,15 +4,15 @@ tryCatch({
     library(xts)
     library(RSQLite)
     
-    source("read_config.r")
+    source("readConfig.r")
     source("logger.r")
     source("tryDb.r")
     source("assert.r")
     source("tryExtract.r")
     source("is.empty.r")
-    source("drop_tables.r")
+    source("dropTables.r")
     source("julianday.r")
-    source("create_year_summary.r")
+    source("createYearSummary.r")
     source("enQuote.r")
     
 }, warning=function(msg){
@@ -593,7 +593,7 @@ started <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 #####################################
 # Load config
 #####################################
-config <- read_config(config_file) # returns an environment
+config <- readConfig(config_file) # returns an environment
 print(paste("Loaded config:", config_file))
 #####################################
 # Set up working directory
@@ -623,7 +623,7 @@ logger.warn(paste("Opened SQLite database:", dbpath))
 #####################################
 # Drop tables
 #####################################
-#drop_tables(conn)
+#dropTables(conn)
 
 #####################################
 # Bulk init DB
@@ -632,7 +632,7 @@ updatedb(conn, config)
 #####################################
 # Bulk init DB
 #####################################
-create_year_summary(conn, "FF_WKCAP", do_drop=TRUE)
+createYearSummary(conn, "FF_WKCAP", do_drop=TRUE)
 
 #####################################
 # Close DB

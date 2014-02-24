@@ -4,13 +4,11 @@ tryCatch({
     library(xts)
     library(RSQLite)
     
-    source("read_config.r")
     source("logger.r")
     source("tryDb.r")
     source("assert.r")
     source("tryExtract.r")
     source("is.empty.r")
-    source("drop_tables.r")
     source("julianday.r")
     source("enQuote.r")
     source("extractDirFromPath.r")

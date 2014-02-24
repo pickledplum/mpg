@@ -20,7 +20,7 @@ tryCatch({
 }
 )
 
-create_year_summary <- function(meta_dbpath, fql, do_drop=FALSE ){
+createYearSummary <- function(meta_dbpath, fql, do_drop=FALSE ){
     
     dbdir <- extractDirFromPath(meta_dbpath)
     meta_conn <- dbConnect( SQLite(), meta_dbpath )

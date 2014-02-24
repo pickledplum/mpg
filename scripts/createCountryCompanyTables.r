@@ -3,8 +3,7 @@ tryCatch({
     library(FactSetOnDemand)
     library(xts)
     library(RSQLite)
-    
-    source("read_config.r")
+
     source("logger.r")
     source("tryDb.r")
     source("assert.r")
@@ -12,7 +11,7 @@ tryCatch({
     source("is.empty.r")
     source("drop_tables.r")
     source("julianday.r")
-    source("create_year_summary.r")
+    source("createYearSummary.r")
     source("enQuote.r")
     
 }, warning=function(msg){

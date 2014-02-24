@@ -3,12 +3,12 @@ tryCatch({
     library(tools)
     library(xts)
     
-    source("read_config.r")
+    source("readConfig.r")
     source("logger.r")
     source("assert.r")
     source("is.empty.r")
-    source("drop_tables.r")
-    source("create_year_summary.r")
+    source("dropTables.r")
+    source("createYearSummary.r")
     source("initTseriesDb.r")
     source("createFreqTable.r")
     source("createFqlTable.r")
@@ -49,7 +49,7 @@ started <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 #####################################
 # Load config
 #####################################
-config <- read_config(config_file) # returns an environment
+config <- readConfig(config_file) # returns an environment
 print(paste("Loaded config:", config_file))
 #####################################
 # Set up working directory
@@ -79,8 +79,8 @@ logger.warn(paste("Opened SQLite database:", dbpath))
 #####################################
 # Drop tables
 #####################################
-#drop_tables(meta_conn, exclude=c("category", "fql", "frequency"))
-#drop_tables(meta_conn)
+#dropTables(meta_conn, exclude=c("category", "fql", "frequency"))
+#dropTables(meta_conn)
 
 #####################################
 # Bulk init DB
@@ -109,7 +109,7 @@ logger.warn("Closed db")
 #####################################
 # Create WKCap summary table
 #####################################
-#create_year_summary(dbpath, "FF_WKCAP", do_drop=FALSE)
+#createYearSummary(dbpath, "FF_WKCAP", do_drop=FALSE)
 
 
 #####################################
