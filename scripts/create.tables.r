@@ -5,7 +5,8 @@
 source("tryDb.r")
 source("logger.r")
 source("dropTables.r")
-
+source("is.empty.r")
+source("tryExtract.r")
 #'
 #' Create CATALOG table
 #'
@@ -21,8 +22,8 @@ create.table.catalog <- function(conn) {
                         "latest     INTEGER")
     
     catalog.constraints <- c("PRIMARY KEY(factset_id, fql)",
-                             "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
-                             "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE NO ACTION ON UPDATE CASCADE")
+                             "FOREIGN KEY(factset_id) REFERENCES company(factset_id) ON DELETE SET DEFAULT ON UPDATE CASCADE", 
+                             "FOREIGN KEY(fql) REFERENCES fql(fql) ON DELETE SET DEFAULT ON UPDATE CASCADE")
     
     catalog.specs <- c(catalog.attrs, catalog.constraints)
     tryCreateTable(conn, "catalog", catalog.specs)
@@ -69,8 +70,8 @@ create.table.company <- function(conn) {
                        "sedol       VARCHAR(20)",
                        "isin        VARCHAR(20)"
     )
-    company.constraints <- c("FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
-                             "FOREIGN KEY(exchange_id) REFERENCES exchange(exchange_id) ON DELETE NO ACTION ON UPDATE CASCADE"
+    company.constraints <- c("FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE SET DEFAULT ON UPDATE CASCADE", 
+                             "FOREIGN KEY(exchange_id) REFERENCES exchange(exchange_id) ON DELETE SET DEFAULT ON UPDATE CASCADE"
     )
     company.specs <- c(company.attrs, company.constraints)
     tryCreateTable(conn, "company", company.specs)
@@ -87,8 +88,8 @@ create.table.country <- function(conn) {
                        "curr_id     CHAR(3)",
                        "market_id   VARCHAR(5)"
     )
-    country.constraints <- c("FOREIGN KEY(curr_id) REFERENCES currency(curr_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
-                             "FOREIGN KEY(market_id) REFERENCES market(market_id) ON DELETE NO ACTION ON UPDATE CASCADE"
+    country.constraints <- c("FOREIGN KEY(curr_id) REFERENCES currency(curr_id) ON DELETE SET DEFAULT ON UPDATE CASCADE", 
+                             "FOREIGN KEY(market_id) REFERENCES market(market_id) ON DELETE SET DEFAULT ON UPDATE CASCADE"
     )
     country.specs <- c(country.attrs, country.constraints)
     tryCreateTable(conn, "country", country.specs)
@@ -110,8 +111,8 @@ create.table.exchange <- function(conn){
                         "country_id             CHAR(3)",
                         "curr_id                CHAR(3)"
     )
-    exchange.constraints <- c("FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE NO ACTION ON UPDATE CASCADE",
-                              "FOREIGN KEY(curr_id) REFERENCES currency(curr_id) ON DELETE NO ACTION ON UPDATE CASCADE"
+    exchange.constraints <- c("FOREIGN KEY(country_id) REFERENCES country(country_id) ON DELETE SET DEFAULT ON UPDATE CASCADE",
+                              "FOREIGN KEY(curr_id) REFERENCES currency(curr_id) ON DELETE SET DEFAULT ON UPDATE CASCADE"
     )
     exchange.specs <- c(exchange.attrs, exchange.constraints)
     tryCreateTable(conn, "exchange", exchange.specs)
@@ -169,8 +170,8 @@ create.table.fql <- function(conn, fql_map_csv){
                          "CHAR(1)", 
                          "VARCHAR(50)",
                          "VARCHAR(200)")
-    fql.column.constraint <-  c("FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE NO ACTION ON UPDATE CASCADE", 
-                                "FOREIGN KEY(freq) REFERENCES frequency(freq) ON DELETE NO ACTION ON UPDATE CASCADE")
+    fql.column.constraint <-  c("FOREIGN KEY(category_id) REFERENCES category(category_id) ON DELETE SET DEFAULT ON UPDATE CASCADE", 
+                                "FOREIGN KEY(freq) REFERENCES frequency(freq) ON DELETE SET DEFAULT ON UPDATE CASCADE")
     
     fql.specs <- c(paste(fql.column.name, fql.column.type), fql.column.constraint)
     tryCreateTableIfNotExists(conn, "fql", fql.specs)
@@ -194,6 +195,29 @@ create.table.fql <- function(conn, fql_map_csv){
 }
 fill.table.catalog <- function(target.conn, source.conn) {
    # simply tranfer from source to target
+    columns <- c("dbname",
+                 "tablename",
+                 "factset_id",
+                 "fql",
+                 "usd",
+                 "local",
+                 "earliest",
+                 "latest"
+    )
+    
+    res <- trySendQuery(source.conn, paste("SELECT", paste(columns, collapse=","), "FROM catalog"))
+
+    while( TRUE ){
+        data <- fetch(res,100)
+        if( is.empty(data) ) {
+            break
+        }
+        for( j in seq(1, ncol(data)) ) {
+            data[[j]] <- enQuote(data[[j]])
+        }
+        tryBulkInsertOrReplace(target.conn, "catalog", columns, data)
+    }
+    dbClearResult(res)
 }
 
 fill.table.company <- function(target.conn, source.conn) {
@@ -206,7 +230,62 @@ fill.table.company <- function(target.conn, source.conn) {
     # transfer
     #  sedol
     #  isin
-    
+    # simply tranfer from source to target
+    source.columns <- c("factset_id",
+                        "company_name"
+    )
+    target.columns <- c("factset_id",
+                        "company",
+                        "sector",
+                        "industry",
+                        "subind",
+                        "country_id",
+                        "exchange_id",
+                        "sedol",
+                        "isin"
+    )
+    cursor <- trySendQuery(source.conn, paste("SELECT", paste(source.columns, collapse=","), "FROM company"))
+    BINSIZE = 100
+    while( TRUE ){
+        company_data <- fetch(cursor,BINSIZE)
+        if( is.empty(company_data) ) {
+            break
+        }
+        for( j in seq(1, ncol(company_data)) ) {
+            company_data[[j]] <- enQuote(company_data[[j]])
+        }
+        extra_master <- NULL
+        for( company in head(company_data[[1]],1) ){
+            items <- c(
+                "FG_COMPANY_NAME",
+                "FF_MAJOR_IND_NAME",
+                "FF_MAJOR_IND",
+                "FF_MAJOR_SUBIND_NAME",
+                "FF_MAJOR_SUBIND",
+                "FG_FACTSET_SECTOR",
+                "FG_FACTSET_SECTORN",
+                "P_EXCOUNTRY(NAME)",
+                "P_EXCOUNTRY(ISO3)",
+                "P_EXCOUNTRY(REG)",
+                "P_CURRENCY(NAME)", # ex curr
+                "P_CURRENCY(ISO)",  # ex curr code
+                "P_DCOUNTRY(NAME)",
+                "P_DCOUNTRY(ISO3)",
+                "P_DCOUNTRY(REG)",
+                "FF_CURN_LOC", # local curr
+                "FF_CURN_ISO", # local curr code
+                "P_EXCHANGE(NAME,FACTSET)",
+                "P_EXCHANGE(CODE,FACTSET)",
+                "FE_COMPANY_INFO(SEDOL)",
+                "FE_COMPANY_INFO(ISIN)"
+            )
+            extra <- trySnapshot(company, items)
+            dbWriteTable(source.conn, "temp", extra)
+        }
+
+        #tryBulkInsertOrReplace(target.conn, "company", target.columns, company_data)
+    }
+    dbClearResult(cursor)
 }
 fill.table.country <- function(target.conn, country_code_table) {
 
@@ -241,32 +320,35 @@ if( !file.exists(target.dbdir) ){
 logger.init(level=logger.DEBUG,
             do_stdout=TRUE)
 
-
 target.conn <- dbConnect(SQLite(), file.path(target.dbdir, target.dbname))
 source.conn <- dbConnect(SQLite(), file.path(source.dbdir, source.dbname))
 
-dropTables(target.conn)
+if(FALSE){
+    dropTables(target.conn)
+    
+    create.table.catalog(target.conn)
+    create.table.category(target.conn) # filled
+    create.table.company(target.conn)
+    create.table.country(target.conn)
+    create.table.frequency(target.conn)  # filled
+    create.table.fql(target.conn, fql_map_csv=fql.map.file) #filled
+    create.table.currency(target.conn)
+    create.table.market(target.conn) # filled
+    create.table.exchange(target.conn)
+    
+    curr_table <- read.csv("/home/honda/mpg/curr_code.csv")
+    fill.table.currency(target.conn, curr_table)
 
-create.table.catalog(target.conn)
-create.table.category(target.conn) # filled
-create.table.company(target.conn)
-create.table.country(target.conn)
-create.table.frequency(target.conn)  # filled
-create.table.fql(target.conn, fql_map_csv=fql.map.file) #filled
-create.table.currency(target.conn)
-create.table.market(target.conn) # filled
-create.table.exchange(target.conn)
+    country_table <- read.csv("/home/honda/mpg/country_code.csv")
+    fill.table.country(target.conn, country_table)
 
-
-fill.table.catalog(target.conn, source.conn)
-fill.table.company(target.conn, source.conn)
-curr_table <- read.csv("/home/honda/mpg/curr_code.csv")
-fill.table.currency(target.conn, curr_table)
-country_table <- read.csv("/home/honda/mpg/country_code.csv")
-fill.table.country(target.conn, country_table)
-#fill.table.exchange(target.conn, source.conn)
+    fill.table.catalog(target.conn, source.conn)
+}
+if(TRUE){
+    fill.table.company(target.conn, source.conn)
+    #fill.table.exchange(target.conn, source.conn)
+}
 
 dbDisconnect(target.conn)
 dbDisconnect(source.conn)
-
 

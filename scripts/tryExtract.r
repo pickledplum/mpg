@@ -122,3 +122,26 @@ tryBulkExtract <- function(fql_syntax, id_list, d1, d2, freq, curr, max_failures
 
     return(data_list)
 }
+trySnapshot <- function(company_id, items, max_failures=5) {
+    
+    ret <- NULL
+    for( nfailure in seq(1, max_failures)) {
+        tryCatch({
+            items_str <- paste(items, collapse=",")
+            
+            logger.debug(items_str)
+            FF.ExtractDataSnapshot(company_id, items_str)
+            break
+        }, error = function(msg){
+            if( nfailure > max_failures){
+                logger.error(paste(nfailure, "th failure:", msg, sep=""))
+                stop(msg)
+            }
+            logger.warn(paste(nfailure, "th failure:", msg, sep=""))
+            Sys.sleep(1)
+        }
+        )
+    }
+    if( is.null(ret) ) return(data.frame())
+    return(ret)
+}

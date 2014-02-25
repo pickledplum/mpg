@@ -146,9 +146,10 @@ trySendQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
 
     q_str <- na2null(q_str)
     logger.debug(q_str)
+    ret <- NULL
     for( nfailure in seq(1, max_failures)) {
         tryCatch({
-            dbSendQuery(conn, q_str)
+            ret <- dbSendQuery(conn, q_str)
             break
         }, error = function(msg){
             if( nfailure > max_failures){
@@ -160,7 +161,7 @@ trySendQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
         }
         )
     }
-    return(TRUE)
+    return(ret)
 }
 tryGetQuery <- function(conn, q_str, max_failures=MAX_FAILURES){
 
