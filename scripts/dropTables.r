@@ -1,4 +1,5 @@
 library(RSQLite)
+source("is.empty.r")
 
 dropTables <- function(conn, exclude=c()){
     

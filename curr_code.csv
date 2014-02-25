@@ -5,7 +5,7 @@ AFN,Afghan afghani
 EUR,Euro
 ALL,Albanian lek
 None,Alderney pound
-GBP,British pound[C]
+GBP,British pound
 GGP,Guernsey pound
 DZD,Algerian dinar
 EUR,Euro
@@ -165,7 +165,7 @@ None,Nagorno-Karabakh dram
 NAD,Namibian dollar
 ZAR,South African rand
 AUD,Australian dollar
-None,Nauruan dollar[A]
+None,Nauruan dollar
 NPR,Nepalese rupee
 EUR,Euro
 XPF,CFP franc
@@ -201,7 +201,7 @@ USD,United States dollar
 DZD,Algerian dinar
 MRO,Mauritanian ouguiya
 MAD,Moroccan dirham
-None,Sahrawi peseta[J]
+None,Sahrawi peseta
 SHP,Saint Helena pound
 XCD,East Caribbean dollar
 XCD,East Caribbean dollar
@@ -245,7 +245,7 @@ TOP,Tongan pa?anga
 PRB,Transnistrian ruble
 TTD,Trinidad and Tobago dollar
 SHP,Saint Helena pound
-None,Tristan da Cunha pound[A]
+None,Tristan da Cunha pound
 TND,Tunisian dinar
 TRY,Turkish lira
 TMT,Turkmenistan manat
@@ -255,7 +255,7 @@ None,Tuvaluan dollar
 UGX,Ugandan shilling
 UAH,Ukrainian hryvnia
 AED,United Arab Emirates dirham
-GBP,British pound[C]
+GBP,British pound
 USD,United States dollar
 UYU,Uruguayan peso
 UZS,Uzbekistani som
@@ -267,7 +267,7 @@ XPF,CFP franc
 YER,Yemeni rial
 ZMW,Zambian kwacha
 BWP,Botswana pula
-GBP,British pound[C]
+GBP,British pound
 EUR,Euro
 ZAR,South African rand
 USD,United States dollar

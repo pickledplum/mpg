@@ -7,7 +7,6 @@ DENMARK		Copenhagen Stock Exchange or CSE
 FINLAND		Helsinki Stock Exchange
 FRANCE		Euronext Paris
 GERMANY		Frankfurt Stock Exchange
-GREECE		Athens Stock Exchange or ASE or ATHEX
 HONG KONG	Hong Kong Stock Exchange (SEHK)
 IRELAND		Irish Stock Exchange (ISE)
 ISRAEL		Tel Aviv Stock Exchange (TASE)
@@ -32,6 +31,7 @@ CHINA		Shanghai Stock Exchange (SSE)
 COLOMBIA	Bolsa de Valores de Colombia (BVC)
 CZECH REPUBLIC	Prague Stock Exchange (PSE)
 EGYPT		Egyptian Exchange (EGX)
+GREECE		Athens Stock Exchange or ASE or ATHEX
 HUNGARY		Budapest Stock Exchange (BSE)
 INDIA		Bombay Stock Exchange (BSE)
 INDONESIA	Indonesia Stock Exchange

@@ -193,7 +193,6 @@ create.table.fql <- function(conn, fql_map_csv){
     logger.info(paste("Populated FQL table:", nrow(fql_map)))
 }
 fill.table.catalog <- function(target.conn, source.conn) {
- logfile <- file.path(wkdir, logfile_name)
    # simply tranfer from source to target
 }
 
@@ -210,15 +209,17 @@ fill.table.company <- function(target.conn, source.conn) {
     
 }
 fill.table.country <- function(target.conn, country_code_table) {
+
     country_code_table[[1]] <- enQuote(country_code_table[[1]])
     country_code_table[[2]] <- enQuote(country_code_table[[2]])
-    tryBulkInsertOrReplace(target.conn, "country", c("country_id", "country"), country_code_table, 1)
+    country_code_table[[3]] <- enQuote(country_code_table[[3]])
+    tryBulkInsertOrReplace(target.conn, "country", c("country_id", "country", "market_id"), country_code_table[c(1,2,3)], 1)
 
 }
 fill.table.currency <- function(target.conn, currency_code_table) {
     currency_code_table[[1]] <- enQuote(currency_code_table[[1]])
     currency_code_table[[2]] <- enQuote(currency_code_table[[2]])
-    tryBulkInsertOrReplace(target.conn, "currency", c("curr_id", "currency"), currency_code_table, 1)
+    tryBulkInsertOrReplace(target.conn, "currency", c("curr_id", "currency"), currency_code_table[c(1,2)], 1)
     
 }
 fill.table.exchange <- function(target.conn, source.conn ){
@@ -244,22 +245,21 @@ logger.init(level=logger.DEBUG,
 target.conn <- dbConnect(SQLite(), file.path(target.dbdir, target.dbname))
 source.conn <- dbConnect(SQLite(), file.path(source.dbdir, source.dbname))
 
-#dropTables(target.conn)
+dropTables(target.conn)
 
-#create.table.catalog(target.conn)
-#create.table.category(target.conn) # filled
-#create.table.company(target.conn)
-#create.table.country(target.conn)
-#create.table.frequency(target.conn)  # filled
-#create.table.fql(target.conn, fql_map_csv=fql.map.file) #filled
-#create.table.currency(target.conn)
-#create.table.market(target.conn) # filled
-#create.table.exchange(target.conn)
+create.table.catalog(target.conn)
+create.table.category(target.conn) # filled
+create.table.company(target.conn)
+create.table.country(target.conn)
+create.table.frequency(target.conn)  # filled
+create.table.fql(target.conn, fql_map_csv=fql.map.file) #filled
+create.table.currency(target.conn)
+create.table.market(target.conn) # filled
+create.table.exchange(target.conn)
 
 
-#fill.table.catalog(target.conn, source.conn)
-#fill.table.category(target.conn, source.conn)
-#fill.table.company(target.conn, source.conn)
+fill.table.catalog(target.conn, source.conn)
+fill.table.company(target.conn, source.conn)
 curr_table <- read.csv("/home/honda/mpg/curr_code.csv")
 fill.table.currency(target.conn, curr_table)
 country_table <- read.csv("/home/honda/mpg/country_code.csv")
