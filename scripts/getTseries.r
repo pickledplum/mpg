@@ -3,6 +3,7 @@ tryCatch({
     source("assert.r")
     source("is.empty.r")
     source("julianday.r")
+    source("extractDirFromPath.r")
     
 }, warning=function(msg){
     print(msg)
@@ -12,11 +13,13 @@ tryCatch({
     stop()
 }
 )
+
+
 #' Get the SQL database name and the table name
-#' 
+#' @param conn connection to the meta db
 #' @param fsid A FactSet ID
 #' @param fql A FQL parameter
-#' 
+#' @return a pair of dbname and tablename
 #' @example 
 #' The time series for FF_ASSETS for Google is stored in the FF_ASSETS.sqlite database.
 #' 
@@ -44,8 +47,7 @@ findTablename <- function(conn, fsid, fql) {
 }
 #' Get the time series corresponding to the company & the FactSet parameter
 #' 
-#' @param meta_conn Connectiion to the meta database
-#' @param sub_db    Either a connection to the FQL-specific sub database or the path to the sub db.
+#' @param conn Open connection to the FQL specific sub-db.
 #' @param fsid FactSet ID
 #' @param fql FQL parameter
 #' @param t0 Start of the time range in YYYY-MM-DD format
@@ -70,43 +72,16 @@ findTablename <- function(conn, fsid, fql) {
 #' > 2013-12-30  -0.799363852
 #' > 2013-12-31   1.014006138
 #' 
-getTSeries <- function(meta_conn, sub_db, fsid, fql, t0, t1){
-    
+.getTSeries <- function(meta_conn, conn, fsid, fql, t0, t1){
+
     ret <- findTablename(meta_conn, fsid, fql)
-    if( is.empty(ret) ){
-        logger.error(paste("No table found:", fsid, fql))
-        return(xts())
-    }
-    sub_dbname <- ret["dbname"]
-    tablename <- ret["tablename"]
     
+    tablename <- ret["tablename"]
     if( is.empty(tablename) ){
         logger.error(paste("No table for:", fsid, ",", fql))
         return(xts())
     }
-    
-    should_close_later = FALSE
-    conn <- NULL
-    if( class(sub_db) == "character" ){
-        db <- file.path(sub_db, sub_dbname)
-        conn <- dbConnect(SQLite(), db)
-        logger.info(paste("Opened db:", db))
-        should_close_later = TRUE
-    } else if( class(sub_db) == "SQLiteConnection" ) {
-        
-        subdb_info <- dbGetInfo(sub_db)
-        tokens <- strsplit(subdb_info$dbname, "/")      
-        actual_sub_dbname <- tail(tokens[[1]],1)
-        if( actual_sub_dbname != sub_dbname ){
-            logger.error(paste("Wrong sub_db: expected", sub_dbname, ", actual", actual_sub_dbname))
-            return(xts())
-        }
-        conn <- sub_db
-    } else{
-        logger.error(paste("Unsupported type for sub_db:", class(sub_db)))
-        return(xts())
-    }
-    
+
     j0 <- julianday(as.Date(t0))
     j1 <- julianday(as.Date(t1))
     
@@ -115,9 +90,6 @@ getTSeries <- function(meta_conn, sub_db, fsid, fql, t0, t1){
     str <- gsub("J0", j0, str)
     str <- gsub("J1", j1, str)
     ret <- tryGetQuery(conn, str)
-    if( should_close_later ){
-        dbDisconnect(conn)
-    }
     
     if( is.empty(ret) ) {
         logger.warn(paste("No data avaiable:", fsid, fql))
@@ -154,21 +126,35 @@ getTSeries <- function(meta_conn, sub_db, fsid, fql, t0, t1){
 #' 2012-12-31 93798           NA
 #' 2013-03-31    NA     36273.25
 #' 
-getBulkTSeries <- function(conn, dbdir, universe, fql, t0, t1) {
+
+makeTSeriesTable <- function(meta_conn, universe, fql, t0, t1) {
+
+    dbinfo <- dbGetInfo(meta_conn)
+    dbdir <- extractDirFromPath(dbinfo$dbname)
+    
     j0 <- julianday(as.Date(t0))
     j1 <- julianday(as.Date(t1))
     temptable <- paste("bulk_", fql, sep="")
-    trySendQuery(conn, paste("DROP TABLE IF EXISTS", temptable))
+    trySendQuery(meta_conn, paste("DROP TABLE IF EXISTS", temptable))
     specs <- c("date INTEGER PRIMARY KEY NOT NULL UNIQUE", paste(enQuote2(universe), rep("FLOAT", length(universe))))
-    tryCreateTempTable(conn, temptable, specs)
+    tryCreateTable(meta_conn, temptable, specs)
     
-    sub_dbname <- paste(fql, ".sqlite", sep="")
-    sub_db <- file.path(dbdir, sub_dbname)
-    sub_conn <- dbConnect(SQLite(), sub_db)
-    logger.info(paste("Opened db:", sub_db))
+    sub_conns <- new.env(hash=TRUE)
     
     for(fsid in universe){
-        tseries <- getTSeries(conn, sub_conn, fsid, fql, t0, t1)
+        browser()
+        ret <- findTablename(meta_conn, fsid, fql)
+        sub_dbname <- ret["dbname"]
+        tablename <- ret["tablename"]
+        sub_conn <- NULL
+        if( exists(sub_dbname, sub_conns) ){
+            sub_conn <- get(sub_dbname, envir=sub_conns)
+        } else {
+            sub_conn <- dbConnect(SQLite(), file.path(dbdir, sub_dbname))
+            assign(sub_dbname, sub_conn, envir=sub_conns)
+        }
+        
+        tseries <- .getTSeries(meta_conn, sub_conn, fsid, fql, t0, t1)
         #print(tseries)
         if( is.empty(tseries) ){
             logger.warn(paste("No data:", fsid, fql, "between", t0, "and", t1))
@@ -186,11 +172,11 @@ getBulkTSeries <- function(conn, dbdir, universe, fql, t0, t1) {
             })
             jdate <- julianday(as.Date(date))
             val <- tseries$usd[k]
-            ret <- trySelect(conn, temptable, c("date"), paste("date=", jdate, sep=""))
+            ret <- trySelect(meta_conn, temptable, c("date"), paste("date=", jdate, sep=""))
             if( is.empty(ret) ){
                 #insert
                 
-                tryInsert(conn, temptable, c("date", fsid),
+                tryInsert(meta_conn, temptable, c("date", fsid),
                           data.frame(c(jdate), c(val))
                 )
             } else{
@@ -199,15 +185,22 @@ getBulkTSeries <- function(conn, dbdir, universe, fql, t0, t1) {
                 str <- gsub("COLUMNNAME", enQuote2(fsid), str)
                 str <- gsub("VALUE", val, str)
                 str <- gsub("JULIANDATE", jdate, str)
-                trySendQuery(conn, str)
+                trySendQuery(meta_conn, str)
             }
         }
     }
-    ret <- trySelect(conn, temptable, c("date(date) as date", enQuote2(universe)), c())
+    return()
+}
+getTSeries <- function(meta_conn, universe, fql, t0, t1){
+    summary_tablename <- makeTSeriesTable(meta_conn, universe, fql, t0, t1)
+    
+    ret <- trySelect(meta_conn, summary_tablename, c("date(date) as date", enQuote2(universe)), c())
     rownames(ret) <- as.Date(ret$date)
     ret <- ret[-c(1)]
     t <- as.xts(ret) 
     
-    dbDisconnect(sub_conn)
+    for( sub_dbname in ls(sub_conns ) ){
+        dbDisconnect(get(sub_dbname, envir=sub_conns))
+    }
     return(t)
 }

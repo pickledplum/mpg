@@ -2,19 +2,20 @@ source("getCompanyInfo.r")
 source("getUniverse.r")
 source("logger.r")
 source("assert.r")
+source("getTseries.r")
 library(xts)
 library(RSQLite)
 
 
-dbdir <- "/home/honda/sqlite-db"
-dbname <- "mini.sqlite"
+dbdir <- "/home/honda/sqlite-db/developed"
+dbname <- "developed.sqlite"
 db <- file.path(dbdir, dbname)
 conn <- dbConnect( SQLite(), db )
 print(paste("Opened SQLite database:", db))
 
 #universe <- c("GOOG", "JP3902400005", "00105510", "004561")
 
-logger.init(level=logger.WARN,
+logger.init(level=logger.DEBUG,
             do_stdout=TRUE)
 
 # Get the IDs of companies with working cap > $300M as of year 2013.
@@ -30,7 +31,7 @@ universe <- getUniverse(conn,
 
 # Get company info (e.g. name)
 r1 <- getCompanyInfo(conn, 
-                     universe=universe$id)
+                     universe=head(universe$id, 5))
 if(is.empty(universe) ){
     stop()
 }
@@ -43,22 +44,19 @@ r2 <- getAvailableFQLs(conn,
 
 r22 <- findTablename(conn, fsid=universe$id[2], "FF_WKCAP")
 
-# Get the time series between 2010/01/01 and 2013/12/31 for a company.
-# The return value is a list of float values.
-r3 <- getTSeries(conn, 
-                 dbdir=dbdir,
-                 fsid=universe$id[2], 
-                 fql="FF_WKCAP", 
-                 t0="2010-01-01", 
-                 t1="2013-12-31")
+t <- makeTSeriesTable(conn,
+                universe=head(universe$id,5), 
+                fql="FF_WKCAP", 
+                t0="2010-01-01", 
+                t1="2013-12-31")
 
 # Get the time series between 2010/01/01 and 2013/12/31 for the list of companies.
 # It returns a data.frame such that column names are company IDs.  The first column is date.
-r4 <- getBulkTSeries(conn, 
-                  dbdir=dbdir,
-                  universe=universe$id, 
-                  fql="FF_WKCAP", 
-                  t0="2010-01-01", 
-                  t1="2013-12-31")
+#r4 <- getTSeries(conn,
+#                  universe=head(universe$id,5), 
+#                  fql="FF_WKCAP", 
+#                  t0="2010-01-01", 
+#                  t1="2013-12-31")
 
 dbDisconnect(conn)
+

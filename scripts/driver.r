@@ -96,20 +96,22 @@ logger.warn(paste("Opened SQLite database:", dbpath))
 
 tseries_dbname_list <- initTseriesDb(meta_conn, config)
 logger.debug(paste("T-series dbs:", paste(tseries_dbname_list, collapse=",")))
-
-#####################################
-# Close DB
-#####################################
 for( pending_result in dbListResults(meta_conn) ){
     dbClearResult(pending_result)
 }
-dbDisconnect(meta_conn)
-logger.warn("Closed db")
 
 #####################################
 # Create WKCap summary table
 #####################################
-#createYearSummary(dbpath, "FF_WKCAP", do_drop=FALSE)
+#createYearSummary(meta_conn, "FF_WKCAP", do_drop=FALSE)
+
+#####################################
+# Close DB
+#####################################
+
+dbDisconnect(meta_conn)
+logger.warn("Closed db")
+
 
 
 #####################################

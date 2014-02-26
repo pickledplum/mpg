@@ -10,6 +10,7 @@ tryCatch({
     source("tryExtract.r")
     source("is.empty.r")
     source("julianday.r")
+    source("extractDirFromPath.r")
     
 }, warning=function(msg){
     print(msg)
@@ -19,12 +20,17 @@ tryCatch({
     stop()
 }
 )
-
-createYearSummary <- function(meta_dbpath, fql, do_drop=FALSE ){
+#' Create the yearly summary of the valuation factor across all companies in the database
+#' @param meta_conn Connection to the meta database
+#' @param fql The FQL parameter for the valuation factor of interest
+#' @return A table named "yearly_<FQL>" will be created in the meta database, where <FQL> is like "FF_WKCAP".
+#' @see The "FQL" table in the meta db for available FactSet parameters (valuation factors)
+#' 
+createYearSummary <- function(meta_conn, fql, do_drop=FALSE ){
     
-    dbdir <- extractDirFromPath(meta_dbpath)
-    meta_conn <- dbConnect( SQLite(), meta_dbpath )
-    logger.warn(paste("Opened SQLite database:", meta_dbpath))
+    dbinfo <- dbGetInfo(meta_conn)
+    dbdir <- extractDirFromPath(dbinfo$dbname)
+    logger.debug(paste("Database:", dbinfo$dbname))
             
     ########################################
     # Collect all the market values by year
@@ -33,6 +39,11 @@ createYearSummary <- function(meta_dbpath, fql, do_drop=FALSE ){
     # collect table names from CATALOG table
     #SELECT factset_id, tablename, usd, earliest, latest FROM catalog
     print(dbGetQuery(meta_conn, "SELECT * FROM sqlite_master"))
+    dbname_list <- tryGetQuery(meta_conn, "SELECT DISTINCT dbname FROM catalog")
+    
+    # Lookup table for open connections to the sub dbs.
+    dbhash <- new.env(hash=TRUE)
+    
     catalog_ret <- trySelect(meta_conn, 
                            "catalog", 
                             c("factset_id", "dbname", "tablename", "usd", "earliest", "latest"),
@@ -78,8 +89,17 @@ createYearSummary <- function(meta_dbpath, fql, do_drop=FALSE ){
         julian_yearstarts <- julianday(seq(earliest_year0101, latest_year0101, by="year"))
         julian_yearends <- julianday(seq(earliest_year1231, latest_year1231, by="year"))
         
-        dbpath <- file.path(dbdir, dbname)
-        tseries_dbconn <- dbConnect(SQLite(), dbpath)
+        ###################################################
+        # Get the open connection if there is already.
+        # If not, open and register with the hashtable.
+        ###################################################
+        if( exists(dbname, envir=dbhash ) ){
+            tseries_dbconn <- get(dbname, envir=dbhash)
+        } else{
+            dbpath <- file.path(dbdir, dbname)
+            tseries_dbconn <- dbConnect(SQLite(), dbpath)
+            assign(dbname, tseries_dbconn, envir=dbhash)
+        }
         
         q_str <- ""
         for( k in seq(1, length(julian_yearstarts) ) ){
@@ -116,12 +136,16 @@ createYearSummary <- function(meta_dbpath, fql, do_drop=FALSE ){
         for( pending_result in dbListResults(tseries_dbconn) ){
             dbClearResult(pending_result)
         }
-        dbDisconnect(tseries_dbconn)
     }
     
     for( pending_result in dbListResults(meta_conn) ){
         dbClearResult(pending_result)
     }
+    for( dbname in ls(dbhash) ){
+        tseries_dbconn <- get(dbname, envir=dbhash)
+        dbDisconnect(tseries_dbconn)
+    }
+    
     dbDisconnect(meta_conn)
     
     logger.info(paste("Populated table:", summary_tablename))
