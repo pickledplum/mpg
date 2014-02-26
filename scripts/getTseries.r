@@ -136,13 +136,14 @@ makeTSeriesTable <- function(meta_conn, universe, fql, t0, t1) {
     j1 <- julianday(as.Date(t1))
     temptable <- paste("bulk_", fql, sep="")
     trySendQuery(meta_conn, paste("DROP TABLE IF EXISTS", temptable))
-    specs <- c("date INTEGER PRIMARY KEY NOT NULL UNIQUE", paste(enQuote2(universe), rep("FLOAT", length(universe))))
+    specs <- c("date CHAR(10) PRIMARY KEY NOT NULL UNIQUE", 
+               paste(enQuote2(universe), rep("FLOAT", length(universe))))
     tryCreateTable(meta_conn, temptable, specs)
     
     sub_conns <- new.env(hash=TRUE)
     
     for(fsid in universe){
-        browser()
+        
         ret <- findTablename(meta_conn, fsid, fql)
         sub_dbname <- ret["dbname"]
         tablename <- ret["tablename"]
@@ -170,26 +171,27 @@ makeTSeriesTable <- function(meta_conn, universe, fql, t0, t1) {
                 logger.error(paste("can't convert to julianday:", date))
                 next
             })
-            jdate <- julianday(as.Date(date))
+            humandate <- as.Date(date) #julianday(as.Date(date))
             val <- tseries$usd[k]
-            ret <- trySelect(meta_conn, temptable, c("date"), paste("date=", jdate, sep=""))
+            ret <- trySelect(meta_conn, temptable, c("date"), paste("date=", enQuote(humandate), sep=""))
+
             if( is.empty(ret) ){
                 #insert
                 
                 tryInsert(meta_conn, temptable, c("date", fsid),
-                          data.frame(c(jdate), c(val))
+                          c(enQuote(humandate),val)
                 )
             } else{
-                str <- "UPDATE TABLENAME SET COLUMNNAME=VALUE WHERE date=JULIANDATE"
-                str <- gsub("TABLENAME", enQuote2(temptable), str)
-                str <- gsub("COLUMNNAME", enQuote2(fsid), str)
+                str <- "UPDATE TABLENAME SET COLUMNNAME=VALUE WHERE date=HUMANDATE"
+                str <- gsub("TABLENAME", enQuote(temptable), str)
+                str <- gsub("COLUMNNAME", enQuote(fsid), str)
                 str <- gsub("VALUE", val, str)
-                str <- gsub("JULIANDATE", jdate, str)
+                str <- gsub("HUMANDATE", enQuote2(humandate), str)
                 trySendQuery(meta_conn, str)
             }
         }
     }
-    return()
+    return(temptable)
 }
 getTSeries <- function(meta_conn, universe, fql, t0, t1){
     summary_tablename <- makeTSeriesTable(meta_conn, universe, fql, t0, t1)

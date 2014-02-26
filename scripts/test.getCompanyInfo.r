@@ -44,9 +44,11 @@ r2 <- getAvailableFQLs(conn,
 
 r22 <- findTablename(conn, fsid=universe$id[2], "FF_WKCAP")
 
-t <- makeTSeriesTable(conn,
+# Gather all the values across universe and store in a new db/table.
+# This returns a pair of dbname and tablename
+dbinfo <- makeTSeriesTable(conn,
                 universe=head(universe$id,5), 
-                fql="FF_WKCAP", 
+                fql="P_TOTAL_RETURNC", 
                 t0="2010-01-01", 
                 t1="2013-12-31")
 
@@ -54,7 +56,7 @@ t <- makeTSeriesTable(conn,
 # It returns a data.frame such that column names are company IDs.  The first column is date.
 #r4 <- getTSeries(conn,
 #                  universe=head(universe$id,5), 
-#                  fql="FF_WKCAP", 
+#                  fql="P_TOTAL_RETURNC", 
 #                  t0="2010-01-01", 
 #                  t1="2013-12-31")
 
