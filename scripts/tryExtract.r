@@ -130,7 +130,7 @@ trySnapshot <- function(company_id, items, max_failures=5) {
             items_str <- paste(items, collapse=",")
             
             logger.debug(items_str)
-            FF.ExtractDataSnapshot(company_id, items_str)
+            ret <- FF.ExtractDataSnapshot(company_id, items)
             break
         }, error = function(msg){
             if( nfailure > max_failures){

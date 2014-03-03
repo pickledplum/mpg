@@ -95,7 +95,6 @@ create.table.country <- function(conn) {
     tryCreateTable(conn, "country", country.specs)
     logger.info(paste("Created COUNTRY table:", paste(country.specs, collapse=",")))
 }
-
 create.table.currency <- function(conn){
     currency.attrs <- c("curr_id CHAR(3) PRIMARY KEY NOT NULL UNIQUE",
                         "currency TEXT(50)"
@@ -104,7 +103,6 @@ create.table.currency <- function(conn){
     tryCreateTable(conn, "currency", currency.specs)
     logger.info(paste("Created CURRENCY table:", paste(currency.specs, collapse=",")))
 }
-
 create.table.exchange <- function(conn){
     exchange.attrs <- c("exchange_id VARCHAR(5) PRIMARY KEY NOT NULL UNIQUE",
                         "exchange               TEXT(100)",
@@ -150,7 +148,6 @@ create.table.market <- function(conn) {
                                       enQuote(c("developed","emerging","frontier","world"))) )
     logger.info(paste("Created & filled MARKET table:", paste(market.specs, collapse=",")))
 }
-
 create.table.fql <- function(conn, fql_map_csv){
 
     ########################################
@@ -193,7 +190,23 @@ create.table.fql <- function(conn, fql_map_csv){
     
     logger.info(paste("Populated FQL table:", nrow(fql_map)))
 }
-fill.table.catalog <- function(target.conn, source.conn) {
+
+fill.table.country <- function(target.conn, country_code_table) {
+    
+    country_code_table[[1]] <- enQuote(country_code_table[[1]])
+    country_code_table[[2]] <- enQuote(country_code_table[[2]])
+    country_code_table[[3]] <- enQuote(country_code_table[[3]])
+    tryBulkInsertOrReplace(target.conn, "country", c("country_id", "country", "market_id"), country_code_table[c(1,2,3)], 1)
+    
+}
+fill.table.currency <- function(target.conn, currency_code_table) {
+    currency_code_table[[1]] <- enQuote(currency_code_table[[1]])
+    currency_code_table[[2]] <- enQuote(currency_code_table[[2]])
+    tryBulkInsertOrReplace(target.conn, "currency", c("curr_id", "currency"), currency_code_table[c(1,2)], 1)
+    
+}
+
+merge.table.catalog <- function(target.conn, source.conn) {
    # simply tranfer from source to target
     columns <- c("dbname",
                  "tablename",
@@ -205,10 +218,10 @@ fill.table.catalog <- function(target.conn, source.conn) {
                  "latest"
     )
     
-    res <- trySendQuery(source.conn, paste("SELECT", paste(columns, collapse=","), "FROM catalog"))
-
+    cursor <- trySendQuery(source.conn, paste("SELECT", paste(columns, collapse=","), "FROM catalog"))
+    BINSIZE <- 100
     while( TRUE ){
-        data <- fetch(res,100)
+        data <- fetch(cursor,BINSIZE)
         if( is.empty(data) ) {
             break
         }
@@ -217,19 +230,14 @@ fill.table.catalog <- function(target.conn, source.conn) {
         }
         tryBulkInsertOrReplace(target.conn, "catalog", columns, data)
     }
-    dbClearResult(res)
+    dbClearResult(cursor)
 }
-
-fill.table.company <- function(target.conn, source.conn) {
-    # pull from FS server
-    #  sector
-    #  industry
-    #  subind
-    #  domicile country
-    #  exchange
-    # transfer
-    #  sedol
-    #  isin
+#' Download company, regional, industry, exchange, etc. data
+#' and create a new table in the target db.
+#' @return The name of the temporary table in the target db.
+download.company.info <- function(target.conn, source.conn) {
+    
+    tablename <- "temp"
     # simply tranfer from source to target
     source.columns <- c("factset_id",
                         "company_name"
@@ -251,59 +259,130 @@ fill.table.company <- function(target.conn, source.conn) {
         if( is.empty(company_data) ) {
             break
         }
-        for( j in seq(1, ncol(company_data)) ) {
-            company_data[[j]] <- enQuote(company_data[[j]])
-        }
-        extra_master <- NULL
-        for( company in head(company_data[[1]],1) ){
-            items <- c(
-                "FG_COMPANY_NAME",
-                "FF_MAJOR_IND_NAME",
-                "FF_MAJOR_IND",
-                "FF_MAJOR_SUBIND_NAME",
-                "FF_MAJOR_SUBIND",
-                "FG_FACTSET_SECTOR",
-                "FG_FACTSET_SECTORN",
-                "P_EXCOUNTRY(NAME)",
-                "P_EXCOUNTRY(ISO3)",
-                "P_EXCOUNTRY(REG)",
-                "P_CURRENCY(NAME)", # ex curr
-                "P_CURRENCY(ISO)",  # ex curr code
-                "P_DCOUNTRY(NAME)",
-                "P_DCOUNTRY(ISO3)",
-                "P_DCOUNTRY(REG)",
-                "FF_CURN_LOC", # local curr
-                "FF_CURN_ISO", # local curr code
-                "P_EXCHANGE(NAME,FACTSET)",
-                "P_EXCHANGE(CODE,FACTSET)",
-                "FE_COMPANY_INFO(SEDOL)",
-                "FE_COMPANY_INFO(ISIN)"
-            )
-            extra <- trySnapshot(company, items)
-            dbWriteTable(source.conn, "temp", extra)
-        }
 
-        #tryBulkInsertOrReplace(target.conn, "company", target.columns, company_data)
+        extra_master <- NULL
+        items <- c(
+                "FG_COMPANY_NAME",                   #1
+                "FF_MAJOR_IND_NAME",                 #2
+                "FF_MAJOR_IND",                      #3
+                "FF_MAJOR_SUBIND_NAME",              #4
+                "FF_MAJOR_SUBIND",                   #5
+                "FG_FACTSET_SECTOR",                 #6
+                "FG_FACTSET_SECTORN",                #7
+                "P_EXCOUNTRY(NAME)",                 #8
+                "P_EXCOUNTRY(ISO3)",                 #9
+                "P_EXCOUNTRY(REG)",                  #10
+                "P_CURRENCY(NAME)", # ex curr        #11
+                "P_CURRENCY(ISO)",  # ex curr code   #12
+                "P_DCOUNTRY(NAME)",                  #13
+                "P_DCOUNTRY(ISO3)",                  #14
+                "P_DCOUNTRY(REG)",                   #15
+                "FF_CURN_LOC", # local curr          #16
+                "FF_CURN_ISO", # local curr code     #17
+                "P_EXCHANGE(NAME,FACTSET)",          #18
+                "P_EXCHANGE(CODE,FACTSET)",          #19
+                "FE_COMPANY_INFO(SEDOL)",            #20
+                "FE_COMPANY_INFO(ISIN)"              #21
+            )
+        extra <- trySnapshot(company_data[[1]], items)
+        dbWriteTable(target.conn, tablename, extra, append=TRUE)
+        
     }
     dbClearResult(cursor)
+    return(tablename)
 }
-fill.table.country <- function(target.conn, country_code_table) {
-
-    country_code_table[[1]] <- enQuote(country_code_table[[1]])
-    country_code_table[[2]] <- enQuote(country_code_table[[2]])
-    country_code_table[[3]] <- enQuote(country_code_table[[3]])
-    tryBulkInsertOrReplace(target.conn, "country", c("country_id", "country", "market_id"), country_code_table[c(1,2,3)], 1)
-
-}
-fill.table.currency <- function(target.conn, currency_code_table) {
-    currency_code_table[[1]] <- enQuote(currency_code_table[[1]])
-    currency_code_table[[2]] <- enQuote(currency_code_table[[2]])
-    tryBulkInsertOrReplace(target.conn, "currency", c("curr_id", "currency"), currency_code_table[c(1,2)], 1)
+merge.table.company <- function(target.conn, source.table) {
     
-}
-fill.table.exchange <- function(target.conn, source.conn ){
+    items <- c("Id AS factset_id",
+      "fg_company_name AS company",
+      "ff_major_ind_name AS industry",
+      "ff_major_subind_name AS subind",
+      "fg_factset_sector AS sector",
+      "p_dcountry_1 AS country_id",
+      "p_exchange_1 AS exchange_id",
+      "fe_company_info AS sedol",
+      "fe_company_info_1 AS isin"
+    )
+    data <- tryGetQuery(target.conn, paste("SELECT DISTINCT", paste(items, collapse=","), "FROM", source.table))
+    for(i in seq(1, ncol(data))){
+        data[[i]] <- enQuote(data[[i]])
+    }
+    BINSIZE <- 100
+    for( begin in seq(1, nrow(data), BINSIZE) ) {
+        end <- min(begin+BINSIZE-1, nrow(data))
+        
+        tryBulkInsertOrReplace(target.conn,
+                      "company2",
+                      c("factset_id",
+                        "company",
+                        "industry",
+                        "subind",
+                        "sector",
+                        "country_id",
+                        "exchange_id",
+                        "sedol",
+                        "isin"
+                      ),
+                      data[c(seq(begin, end)),]
+        )
+    }
 }
 
+fill.table.exchange <- function(target.conn, source.table){
+    items <- c("p_exchange_1 AS exchange_id",
+                "p_exchange AS exchange",
+                "p_excountry_1 AS country_id",
+                "p_currency_1 AS curr_id"
+    )
+
+    ret <- tryGetQuery(target.conn, paste("SELECT DISTINCT", paste(items, collapse=","), "FROM", enQuote(source.table), "GROUP BY exchange_id"))
+    ret[[1]] <- enQuote(ret[[1]])
+    ret[[2]] <- enQuote(ret[[2]])
+    ret[[3]] <- enQuote(ret[[3]])
+    ret[[4]] <- enQuote(ret[[4]])
+    tryBulkInsert(target.conn, 
+                  "exchange", 
+                  c("exchange_id", "exchange", "country_id", "curr_id"),
+                  ret)
+
+}
+update.table.country <- function(target.conn, source.table) {
+    items <- c("p_dcountry_1 AS country_id",
+               "p_dcountry_2 AS region",
+               "ff_curn_iso AS curr_id"
+    )
+    data <- tryGetQuery(target.conn, paste("SELECT DISTINCT", paste(items, collapse=","), "FROM", source.table))
+
+    for( i in seq(1, nrow(data)) ){
+        entry <- data[i,]
+        country_id <- entry[1]
+        region <- entry[2]
+        curr_id <- entry[3]
+        q_str <- "UPDATE country SET region=<REGION>, curr_id=<CURR_ID> WHERE country_id=<COUNTRY_ID>"
+        q_str <- gsub("<REGION>", enQuote(region), q_str)
+        q_str <- gsub("<CURR_ID>", enQuote(curr_id), q_str)
+        q_str <- gsub("<COUNTRY_ID>", enQuote(country_id), q_str)
+        trySendQuery(target.conn, q_str)
+    }
+    
+    items <- c("p_excountry_1 AS country_id",
+               "p_excountry_2 AS region",
+               "p_currency_1 AS curr_id"
+    )
+    data <- tryGetQuery(target.conn, paste("SELECT DISTINCT", paste(items, collapse=","), "FROM", source.table))
+    
+        for( i in seq(1, nrow(data)) ){
+            entry <- data[i,]
+            country_id <- entry[1]
+            region <- entry[2]
+            curr_id <- entry[3]
+            q_str <- "UPDATE country SET region=<REGION>, curr_id=<CURR_ID> WHERE country_id=<COUNTRY_ID>"
+            q_str <- gsub("<REGION>", enQuote(region), q_str)
+            q_str <- gsub("<CURR_ID>", enQuote(curr_id), q_str)
+            q_str <- gsub("<COUNTRY_ID>", enQuote(country_id), q_str)
+            trySendQuery(target.conn, q_str)
+        }
+}
 
 target.dbdir <- "/home/honda/sqlite-db/new"
 target.dbname <- "meta.sqlite"
@@ -323,6 +402,7 @@ logger.init(level=logger.DEBUG,
 target.conn <- dbConnect(SQLite(), file.path(target.dbdir, target.dbname))
 source.conn <- dbConnect(SQLite(), file.path(source.dbdir, source.dbname))
 
+temp_tablename <- "temp"
 if(FALSE){
     dropTables(target.conn)
     
@@ -342,11 +422,19 @@ if(FALSE){
     country_table <- read.csv("/home/honda/mpg/country_code.csv")
     fill.table.country(target.conn, country_table)
 
-    fill.table.catalog(target.conn, source.conn)
+    merge.table.catalog(target.conn, source.conn)
+    
+    # temp table containing bulk company info
+    temp_tablename <- download.company.info(target.conn, source.conn)
+    fill.table.exchange(target.conn, temp_tablename)
+    update.table.country(target.conn, temp_tablename)
 }
 if(TRUE){
-    fill.table.company(target.conn, source.conn)
-    #fill.table.exchange(target.conn, source.conn)
+    
+    
+    merge.table.company(target.conn, temp_tablename)
+
+    
 }
 
 dbDisconnect(target.conn)

@@ -26,7 +26,7 @@ tryCatch({
 #####################################
 # Constants
 #####################################
-tag <- "developed"
+tag <- "japan500"
 dbdir <- file.path("/home/honda/sqlite-db", tag)
 if( !file.exists(dbdir) ){
     dir.create(dbdir)
@@ -85,14 +85,14 @@ logger.warn(paste("Opened SQLite database:", dbpath))
 #####################################
 # Bulk init DB
 #####################################
-#createFreqTable(meta_conn)
+createFreqTable(meta_conn)
 
-#stopifnot( exists("FQL_MAP", envir=config) )
-#fql_map_filename <- get("FQL_MAP", envir=config)
-#createFqlTable(meta_conn, fql_map_filename)
-#createCategoryTable(meta_conn)
+stopifnot( exists("FQL_MAP", envir=config) )
+fql_map_filename <- get("FQL_MAP", envir=config)
+createFqlTable(meta_conn, fql_map_filename)
+createCategoryTable(meta_conn)
 
-#createCountryCompanyTables(meta_conn, config)
+createCountryCompanyTables(meta_conn, config)
 
 tseries_dbname_list <- initTseriesDb(meta_conn, config)
 logger.debug(paste("T-series dbs:", paste(tseries_dbname_list, collapse=",")))
@@ -103,7 +103,7 @@ for( pending_result in dbListResults(meta_conn) ){
 #####################################
 # Create WKCap summary table
 #####################################
-#createYearSummary(meta_conn, "FF_WKCAP", do_drop=FALSE)
+createYearSummary(meta_conn, "FF_WKCAP", do_drop=FALSE)
 
 #####################################
 # Close DB

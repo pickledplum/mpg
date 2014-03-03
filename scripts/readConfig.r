@@ -12,7 +12,7 @@
 # FF_ASSETS=Q
 # FF_CACH_ONLY=Q,LOCAL
 #
-read_config <- function( config_file ) {
+readConfig <- function( config_file ) {
     
     table <- read.table(config_file, sep="=", comment.char="#", strip.white=TRUE, as.is=TRUE)
     rownames(table) <- table[,1]

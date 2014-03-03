@@ -9,7 +9,7 @@ tryCatch({
     source("assert.r")
     source("tryExtract.r")
     source("is.empty.r")
-    source("drop_tables.r")
+    source("dropTables.r")
     source("julianday.r")
     source("createYearSummary.r")
     source("enQuote.r")
@@ -158,17 +158,17 @@ createCountryCompanyTables <- function(conn, config) {
     
     company.meta.fql <- c("FG_COMPANY_NAME",
                           "P_DCOUNTRY",
-                          "P_COUNTRY_ISO",    
+                          "P_DCOUNTRY(ISO3)",    
                           "P_DCOUNTRY(REG)",
                           "P_EXCHANGE",
                           "P_CURRENCY",
                           "P_CURRENCY_CODE",
                           "FE_COMPANY_INFO(ISIN)",
                           "FE_COMPANY_INFO(SEDOL)",
-                          "FG_GICS_SECTOR",
+                          "FG_FACTSET_SECTOR",
                           "FG_GICS_INDGRP",
-                          "FG_GICS_INDUSTRY",
-                          "FG_GICS_SUBIND")
+                          "FF_MAJOR_IND_NAME",
+                          "FF_MAJOR_SUBIND_NAME")
     
     company.meta.titles <- c(
         "id", 
