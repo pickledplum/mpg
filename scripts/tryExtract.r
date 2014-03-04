@@ -94,19 +94,26 @@ tryBulkExtract <- function(fql_syntax, id_list, d1, d2, freq, curr, max_failures
             if( is.empty(ret) ){
                 break
             }
+
             # split by companies, into the list of data frames
             data_list <- split(ret, f=factor(ret[["Id"]]))
             
             for( i in seq(1, length(data_list)) ){
+                
                 data <- data_list[[i]]
                 if( is.empty(data) ) next
                 
                 filter <- which(is.na(data[[3]]))
-                ddata <- data[-filter,]
+                if( length(filter) > 0 ) {
+                    ddata <- data[-filter,]
+                } else {
+                    ddata <- data
+                }
                 #if( is.empty(ddata) ) next
                 id <- data[1,1]
                 colnames(ddata) <- c("Id", "Date", id)
                 data_list[[i]] <- ddata
+                #print(data_list[[i]])
             }
             break
         }, error = function(msg){

@@ -3,12 +3,12 @@ tryCatch({
     library(tools)
     library(xts)
     
-    source("readConfig.r")
+    source("read_config.r")
     source("logger.r")
     source("assert.r")
     source("is.empty.r")
-    source("dropTables.r")
-    source("createYearSummary.r")
+    source("drop_tables.r")
+    source("create_year_summary.r")
     source("initTseriesDb.r")
     source("createFreqTable.r")
     source("createFqlTable.r")
@@ -49,8 +49,9 @@ started <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 #####################################
 # Load config
 #####################################
-config <- readConfig(config_file) # returns an environment
+config <- read_config(config_file) # returns an environment
 print(paste("Loaded config:", config_file))
+
 #####################################
 # Set up working directory
 #####################################
@@ -64,7 +65,7 @@ stopifnot( file.exists(wkdir) )
 # Open Logger
 #####################################
 logfile <- file.path(wkdir, logfile_name)
-logger.init(level=logger.DEBUG,
+logger.init(level=logger.INFO,
             do_stdout=do_stdout,
             logfile=logfile)
 
@@ -79,39 +80,37 @@ logger.warn(paste("Opened SQLite database:", dbpath))
 #####################################
 # Drop tables
 #####################################
-#dropTables(meta_conn, exclude=c("category", "fql", "frequency"))
-#dropTables(meta_conn)
+#drop_tables(meta_conn, exclude=c("category", "fql", "frequency"))
+#drop_tables(meta_conn)
 
 #####################################
 # Bulk init DB
 #####################################
-#createFreqTable(meta_conn)
+createFreqTable(meta_conn)
 
-#stopifnot( exists("FQL_MAP", envir=config) )
+stopifnot( exists("FQL_MAP", envir=config) )
 fql_map_filename <- get("FQL_MAP", envir=config)
 createFqlTable(meta_conn, fql_map_filename)
-#createCategoryTable(meta_conn)
+createCategoryTable(meta_conn)
 
-#createCountryCompanyTables(meta_conn, config)
+createCountryCompanyTables(meta_conn, config)
 
 tseries_dbname_list <- initTseriesDb(meta_conn, config)
 logger.debug(paste("T-series dbs:", paste(tseries_dbname_list, collapse=",")))
-for( pending_result in dbListResults(meta_conn) ){
-    dbClearResult(pending_result)
-}
-
-#####################################
-# Create WKCap summary table
-#####################################
-#createYearSummary(meta_conn, "FF_WKCAP", do_drop=FALSE)
 
 #####################################
 # Close DB
 #####################################
-
+for( pending_result in dbListResults(meta_conn) ){
+    dbClearResult(pending_result)
+}
 dbDisconnect(meta_conn)
 logger.warn("Closed db")
 
+#####################################
+# Create WKCap summary table
+#####################################
+create_year_summary(dbpath, "FF_WKCAP", do_drop=FALSE)
 
 
 #####################################
