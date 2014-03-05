@@ -41,6 +41,7 @@ config_file <- paste("/Users/honda/Documents/GitHub/mpg/", tag, ".conf", sep="")
 
 logfile_name <- paste(tag, ".log", sep="")
 do_stdout <- TRUE
+
 #####################################
 # Start...
 #####################################
@@ -51,6 +52,7 @@ started <- format(Sys.time(), "%Y-%m-%d_%H-%M-%S")
 #####################################
 config <- readConfig(config_file) # returns an environment
 print(paste("Loaded config:", config_file))
+
 #####################################
 # Set up working directory
 #####################################
@@ -103,7 +105,7 @@ for( pending_result in dbListResults(meta_conn) ){
 #####################################
 # Create WKCap summary table
 #####################################
-#createYearSummary(meta_conn, "FF_WKCAP", do_drop=FALSE)
+createYearSummary(meta_conn, "FF_WKCAP", do_drop=FALSE)
 
 #####################################
 # Close DB
