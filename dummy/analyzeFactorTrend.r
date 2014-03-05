@@ -1,124 +1,162 @@
 #' Mining indicators
 #' 
 library(RSQLite)
+library(psych)
+
 source("getUniverse.r")
 source("getTSeries.r")
 source("logger.r")
+source("incrementByNMonth.r")
+
 logger.init(logger.DEBUG)
 
 # DB connection
-#conn <- dbConnect(SQLite(), "/home/honda/sqlite-db/mini/mini.sqlite")
-conn <- dbConnect(SQLite(), "/home/honda/sqlite-db/japan500/japan500.sqlite")
+dblocation <- "R:/temp/honda/sqlite-db/japan500/japan500.sqlite"
+conn <- dbConnect(SQLite(), dblocation)
+logger.info(paste("Opened DB:", dblocation))
 
-# look ahead months
-study_months <- c(1,3,6,12)
 
 # Define a universe
-universe <- getUniverse(conn, mktval=-100000, year=2013)$id
+mkval_min <- -100000
+mkval_year <- 2013
+universe <- getUniverse(conn, mktval=mkval_min, year=mkval_year)$id
+logger.info(paste("Filtered universe by market value >=", mkval_min, "as of", mkval_year)) 
 
-
-# Pick a factor or two
+# Pick factors to use
 factors <- c("FF_BPS", "P_PRICE_AVG", "P_TOTAL_RETURNC")
+
+#
+# Consolidate time series into a single big time table where rows=:timestamps, cols=:companies
+#
 #bps <- getBulkTSeries(conn, "/home/honda/sqlite-db/japan500", universe, factors[1], "1980-01-01", "2013-12-31")
 #price <- getBulkTSeries(conn, "/home/honda/sqlite-db/japan500", universe, factors[2], "1980-01-01", "2013-12-31")
-#careful, this will take 6-8 hours
+#WARNING: Tthis daily data has taken 6 hours on XP32 w/ 3GB mem
 #total_r <- getBulkTSeries(conn, "/home/honda/sqlite-db/japan500", universe, factors[3], "1980-01-01", "2013-12-31")
 
 # price to book
 x1 <- dbReadTable(conn, "bulk_FF_BPS")
 bps <- as.xts(x1, as.Date(unjulianday(x1[[1]])))
+logger.debug("Downloaded the monthly book per share table data")
+
 # price
 x2 <- dbReadTable(conn, "bulk_P_PRICE_AVG")
 price <- as.xts(x2, as.Date(unjulianday(x2[[1]])))
+logger.debug("Downloaded the monthly price data")
 
 # total return, compounded
 x3 <- dbReadTable(conn, "bulk_P_TOTAL_RETURNC")
 trc <- as.xts(x3, as.Date(unjulianday(x3[[1]])))
+logger.debug("Downloaded the daily total returns")
 
-valid_days <- as.character(as.Date(intersect(index(price), index(bps))))
+# Done with the db
+dbDisconnect(conn)
+logger.info("Closed the db")
+
+# grab intersection of the two time series (price and book per share) by year and month.
+valid_months <- as.character(intersect(substr(index(price),1,7), substr(index(bps),1,7)))
+
+# landmark months
+months <- c(0,1,3,6,12)
+
+nmons <- length(months)
+nbins <- 5
+logger.debug(paste("Valid months: min,max,# - ", paste(min(valid_months), max(valid_months),nmons),sep=","))
 
 # iterate from the most recent to the oldest
-for( timestamp in tail(valid_days,13) ){
-#timestamp <- tail(valid_days,1)
-    browser()
+for( timestamp in tail(valid_months,100) ){
+    yy <- rep(0,nmons)
+    mm <- rep(0,nmons)
+    
+    # Returns for each month
+    r <- list()
+    
+    logger.info(timestamp)
+    
+    # Reference point data
     tokens <- as.integer(strsplit(timestamp, "-")[[1]])
-    yy <- tokens[1]
-    mm <- tokens[2]
+    yy[1] <- tokens[1]
+    mm[1] <- tokens[2]
+    r[[1]] <- trc[ paste(yy[1],mm[1],sep="-")][1,]
 
-    # calculate returns over the next ... periods
+    for(j in seq(2,nmons)) {
+
+        tokens <- incrementByNMonth(yy[1],mm[1],months[j])
+        yy[j] <- tokens[1]
+        mm[j] <- tokens[2]    
+        if( is.empty(trc[ paste(yy[j],mm[j],sep="-")]) )
+            break
+        r[[j]] <- trc[ paste(yy[j],mm[j],sep="-")][1,]
     
-    # base case
-    r0 <- trc[ paste(yy,mm,sep="-")][1,]
-    
-    # 12 months
-    tokens <- incrementByNMonth(yy,mm,12)
-    yy4 <- tokens[1]
-    mm4 <- tokens[2]    
-    if( is.empty(trc[ paste(yy4,mm4,sep="-")]) ) {
-        logger.warn("Insufficient look ahead data")
-        next
     }
-    #browser()
-    r4 <- trc[ paste(yy4,mm4,sep="-")][1,]
-
-    # 6 months
-    tokens <- incrementByNMonth(yy,mm,6)
-    yy3 <- tokens[1]
-    mm3 <- tokens[2]
-    r3 <- trc[ paste(yy3,mm3,sep="-")][1,]
+    # if there is no 12 months from now, we are done
+    if( is.empty(trc[ paste(yy[5],mm[5],sep="-")]) ) {
+        logger.warn("No more 12 months in forward.  Done...")
+        break
+    }
+  
+    # covnert to vector in order to ignore possible date difference
+    # we only care about month resolution
+    pbk <- as.vector(price[timestamp]) / as.vector(bps[timestamp])
+    names(pbk) <- colnames(price)[2:ncol(price)]
+    pbk <- pbk[!is.na(pbk)]
     
-    # 3 months
-    tokens <- incrementByNMonth(yy,mm,3)
-    yy2 <- tokens[1]
-    mm2 <- tokens[2]
-    r2 <- trc[ paste(yy2,mm2,sep="-")][1,]
-    
-    # one month
-    tokens <- incrementByNMonth(yy,mm,1)
-    yy1 <- tokens[1]
-    mm1 <- tokens[2]
-    r1 <- trc[ paste(yy1,mm1,sep="-")][1,]
-    
-    pbk <- price[timestamp] / bps[timestamp]
-    pbk <- pbk[,!is.na(pbk)]
     sorted_index <- order(pbk, decreasing=FALSE)
-    sorted_pbk <- pbk[,sorted_index]
-    
+    sorted_pbk <- pbk[sorted_index]
+
     # indicies for each quintile
-    range <- ncol(sorted_pbk)
-    q1_begin <- 1
-    q2_begin <- range/5
-    q3_begin <- range/5*2
-    q4_begin <- range/5*3
-    q5_begin <- range/5*4
-    q1 <- sorted_index[q1_begin:q2_begin-1]
-    q2 <- sorted_index[q2_begin:q3_begin-1]
-    q3 <- sorted_index[q3_begin:q4_begin-1]
-    q4 <- sorted_index[q4_begin:q5_begin-1]
-    q5 <- sorted_index[q5_begin:range]
-}
-dbDisconnect(conn)
-
-incrementByNMonth <- function( yy, mm, N ){
-    if( mm + N > 12 ){
-        yy = yy + 1
-        mm = (mm+N)-12
-    } else{
-        mm = mm + N
-    }
-    return( c(yy,mm) )
-}
-decrementByNMonth <- function( yy, mm, N ){
-    if( mm - N < 1 ){
-        yy = yy - 1
-        mm = (mm-N)+12
-    } else{
-        mm = mm - N
-    }
-    return( c(yy,mm) )
-}
-
-annualizeSigmaDailyTotalReturn <- function(x, y) {
+    range <- length(sorted_pbk)
+    h <- as.integer(range/nbins)
+    q_begin <- seq(0,nbins,1)
+    q_index <- rep(0,nbins)
+    q_ids <- rep("",nbins)
+    mu <- rep(0,nbins)
     
+    q_mu <- matrix(NA, nrow=nbins,ncol=nmons)
+    q_div <- matrix(NA, nrow=nbins,ncol=nmons)
+    rr.over <- matrix(NA, nrow=nbins, ncol=nmons)
+    
+    for(i in 1:nbins){
+        
+        q_begin[i] <- q_begin[i] * h + 1
+        q_index[i] <- sorted_index[q_begin[i]:q_begin[i]+h-1]
+        q_ids[i] <- names(pbk)[q_index[i]]
+    }
+    #quintile
+    for(i in 1:nbins){
+        # lookout points
+        for(j in 1:nmons){
+            # mean over all data for each period
+            if(i==1) mu[j] <- mean(r[[j]])
+            
+            # mean over data within the quintile for each period
+            q_mu[i,j] <- mean(as.vector(r[[j]][,q_ids[i]], mode="numeric"), na.rm=TRUE)
+            # diviation from the mean
+            q_div[i,j] <- q_mu[i,j] - mu[j]
+            # growth rate of return from the reference month
+            rr.over[i,j] <- (q_mu[i,j] - q_mu[i,1]) / q_mu[i,1]
+        }
+    }
+
+    y_max <- +20 #ceiling(max(q_mu))
+    y_min <- -20 # floor(min(q_mu))
+    plot(x=1,y=1, type="n", xlim=c(0,12), ylim=c(y_min,y_max), axes=FALSE, 
+         xlab=timestamp, ylab="Delta Return (%)") 
+    axis(side=1, at=months) 
+    axis(side=2, at=seq(y_min,y_max,1) )
+    points(months, q_mu[1,], col="dark red")
+    lines(months, q_mu[1,], col="dark red")
+    #points(months, q_mu[2,], col="dark orange")
+    #lines(months, q_mu[2,], col="dark orange")
+    ##points(months, q_mu[3,], col="dark yellow")
+    #lines(months, q_mu[3,], col="dark yellow")
+    #points(months, q_mu[4,], col="dark green")
+    #lines(months, q_mu[4,], col="dark green")
+    points(months, q_mu[5,], col="dark blue")
+    lines(months, q_mu[5,], col="dark blue")
+    points(months, mu, col="magenta")
+    lines(months, mu, col="magenta")
+    Sys.sleep(1)
 }
+
+
 

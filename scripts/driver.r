@@ -26,8 +26,8 @@ tryCatch({
 #####################################
 # Constants
 #####################################
-tag <- "japan500"
-dbdir <- file.path("/home/honda/sqlite-db", tag)
+tag <- "mini"
+dbdir <- file.path("R:/temp/honda/sqlite-db", tag)
 if( !file.exists(dbdir) ){
     dir.create(dbdir)
 }
@@ -37,7 +37,7 @@ if( !file.exists(wkdir) ){
 }
 dbname <- paste(tag, ".sqlite", sep="")
 dbpath <- file.path(dbdir, dbname)
-config_file <- paste("/home/honda/mpg/", tag, ".conf", sep="")
+config_file <- paste("/Users/honda/Documents/GitHub/mpg/", tag, ".conf", sep="")
 
 logfile_name <- paste(tag, ".log", sep="")
 do_stdout <- TRUE
@@ -85,14 +85,14 @@ logger.warn(paste("Opened SQLite database:", dbpath))
 #####################################
 # Bulk init DB
 #####################################
-#createFreqTable(meta_conn)
+createFreqTable(meta_conn)
 
-#stopifnot( exists("FQL_MAP", envir=config) )
+stopifnot( exists("FQL_MAP", envir=config) )
 fql_map_filename <- get("FQL_MAP", envir=config)
 createFqlTable(meta_conn, fql_map_filename)
-#createCategoryTable(meta_conn)
+createCategoryTable(meta_conn)
 
-#createCountryCompanyTables(meta_conn, config)
+createCountryCompanyTables(meta_conn, config)
 
 tseries_dbname_list <- initTseriesDb(meta_conn, config)
 logger.debug(paste("T-series dbs:", paste(tseries_dbname_list, collapse=",")))
