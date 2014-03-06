@@ -36,20 +36,20 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins ){
         yy <- rep(0,n_periods)
         mm <- rep(0,n_periods)
 
-        pbk <- as.vector(controlVar[this_year_month])
-        logger.debug("pbk: ", paste(pbk, collapse=","))
-        names(pbk) <- colnames(controlVar)
-        logger.debug("Names(pbk): ", paste(names(pbk), collapse=","))
+        factor <- as.vector(controlVar[this_year_month])
+        logger.debug("factor: ", paste(factor, collapse=","))
+        names(factor) <- colnames(controlVar)
+        logger.debug("Names(factor): ", paste(names(factor), collapse=","))
         # Get rid of NAs
-        pbk <- pbk[!is.na(pbk)]
-        if( is.empty(pbk) ){
-            logger.warn("No pbk data.  Skipping...")
+        factor <- factor[!is.na(factor)]
+        if( is.empty(factor) ){
+            logger.warn("No factor data.  Skipping...")
             next
         }
-        logger.debug("pbk on ", this_year_month, ":", paste(pbk,collapse=","))
+        logger.debug("factor on ", this_year_month, ":", paste(factor,collapse=","))
         # Sort in the ascending order
-        sorted_index <- order(pbk, decreasing=FALSE)
-        sorted_pbk <- pbk[sorted_index]
+        sorted_index <- order(factor, decreasing=FALSE)
+        sorted_pbk <- factor[sorted_index]
     
         logger.debug("Sorted index: ", sorted_index)
         
@@ -62,7 +62,7 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins ){
         percentile_notations <- vector("numeric", nbins)
         h <- as.integer(range/nbins)
         bin_ids <- list()
-        sorted_ids <- names(pbk)[sorted_index] 
+        sorted_ids <- names(factor)[sorted_index] 
         for(i in 1:nbins){
             begin <- (i-1) * h + 1
             end <- begin + h - 1
