@@ -18,10 +18,19 @@ dblocation <- "R:/temp/honda/sqlite-db/japan500-keep/japan500.sqlite"
 conn <- dbConnect(SQLite(), dblocation)
 logger.info(paste("Opened DB:", dblocation))
 
+# future periods, in month, to project onto
+periods <- c(1,3,6,12)
+
+# Number of bins.  e.g. 5 for quintilizing
+nbins <- 5
+
+# colors in the order of lower to higher bins
+pallet <- c("dark blue","dark green","yellow","dark orange","dark red")
 
 # Define a universe
 mkval_min <- -100000
 mkval_year <- 2013
+
 universe <- getUniverse(conn, mktval=mkval_min, year=mkval_year)$id
 universe <- tail(universe)
 logger.info(paste("Filtered universe by market value >=", mkval_min, "as of", mkval_year)) 
@@ -62,10 +71,7 @@ logger.info("Closed the db")
 # grab intersection of the two time series (price and book per share) by year and month.
 valid_months <- as.character(intersect(substr(index(price),1,7), substr(index(bps),1,7)))
 
-# landmark periods
-periods <- c(1,12,24,36)
 
-nbins <- 5
 
 oldest_this_year_month <- min(valid_months)
 tokens <- as.integer(strsplit(oldest_this_year_month, "-")[[1]])
@@ -76,11 +82,13 @@ tokens <- as.integer(strsplit(latest_this_year_month, "-")[[1]])
 latest_yy <- tokens[1]
 latest_mm <- tokens[2]
 
+# lower percentile to higher percentile
+pallet <- c("blue","green","yellow","orange","red")
 n_periods <- length(periods)
 
 logger.debug(paste("Valid months: min,max,# - ", paste(oldest_this_year_month, latest_this_year_month, n_periods),sep=","))
 # iterate from the most recent to the oldest
-for( this_year_month in tail(valid_months,100) ){
+for( this_year_month in valid_months ){
     logger.info("Processing ", this_year_month, "...")
     
     yy <- rep(0,n_periods)
@@ -171,7 +179,7 @@ for( this_year_month in tail(valid_months,100) ){
     for(period in seq(1,n_periods)) {
 
         next_period <- advanceMonths(this_year_month, periods[period]-1)  
-        logger.info("Looking into ", next_period) 
+        logger.debug("Looking into ", next_period) 
         data <- totalR[next_period]
         if( !is.empty((totalR[next_period])) ){
             
@@ -180,7 +188,23 @@ for( this_year_month in tail(valid_months,100) ){
             #print(dailyR[[period]])
 
         } else{
-            are_we_done <- TRUE
+            # check if there is really no more data beyond that point
+            tokens <- as.integer(strsplit(next_period, "-")[[1]])
+            next_yy <- tokens[1]
+            next_mm <- tokens[2]
+            if( next_yy > latest_yy ) {
+                # obvious, this is done
+                are_we_done <- TRUE
+            } else if( next_yy == laste_yy ) {
+                if( next_mm > latest_mm ){
+                    # sure, went beyond
+                    are_we_done <- TRUE
+                }
+            } else {
+                # No, it's just missing data for this period
+                logger.warn("Skipping this time period in the future due to the lack of data: ", next_period)
+                next
+            }
         }
         previous_period <- next_period
         
@@ -191,7 +215,7 @@ for( this_year_month in tail(valid_months,100) ){
         break
     }
     
-    # Compute compounded return for each period
+    # Compute compounded return upto the period
     #
     compoundedR <- list()
     projectedPrice <- list()
@@ -204,11 +228,11 @@ for( this_year_month in tail(valid_months,100) ){
             names(r) <- bin_ids[[bin]]
             for( i in 1:length(bin_ids[[bin]]) ){
                 company <- bin_ids[[bin]][i]
-                
-                logger.debug("Visiting ", company)
-                # set the base case
-                
-                r[i] <- getCompoundedReturn( 1., as.vector(dailyR[[period]][,company]) )
+                returns <- as.vector(dailyR[[period]][,company]) 
+                # annualize?
+                #returns <- returns / 260.
+                logger.debug("Visiting ", company)            
+                r[i] <- getCompoundedReturn( 1., returns )
             }   
 
             compoundedR_this_bin[[bin]] = r
@@ -219,30 +243,46 @@ for( this_year_month in tail(valid_months,100) ){
 
     }
     #print(compoundedR)
-    # average out across the companies within a bin, and annualize
-    m <- matrix(NA, nrow=nbins, ncol=n_periods)
-    colnames(m) <- periods
+    # average out across the companies within a bin
+    #
+    # Example: The resulting matrix has the dimensions of nbins by nperiods.
+    #         1mon     3mon     6mon     12mon
+    # 0-20     r11      r12      r13       r14
+    # 21-40
+    # 41-60
+    # 61-80
+    # 81-100
+    all_returns <- matrix(NA, nrow=nbins, ncol=n_periods)
+    colnames(all_returns) <- periods
     for( bin in 1:nbins) {
         for( period in 1:n_periods) {
             bin_r <- compoundedR[[period]][[bin]] #/ max(periods) * periods[period]
-            m[bin,period] <- mean(bin_r)
+            all_returns[bin,period] <- mean(bin_r)
         }
     }
-    m <- m*100.  # to percent 
+    period_mean <- vector("numeric", length=n_periods)
+    rel_returns <- matrix(NA, nrow=nbins, ncol=n_periods)
+    colnames(rel_returns) <- periods
+    for ( period in 1:n_periods ) {
+        period_mean[period] <- mean(all_returns[,period])
+        rel_returns[,period] <- all_returns[,period] - period_mean[period]
+    }
+    
+    rel_returns <- rel_returns * 100.  # to percent 
+    
     if(TRUE) {
-        # lower percentile to higher percentile
-        pallet <- c("blue","green","yellow","orange","red")
-        y_max <- 100 #ceiling(max(m[!is.na(m)]))
-        y_min <- -100 #floor(min(m[!is.na(m)]))
+        y_max <- ceiling(max(rel_returns[!is.na(rel_returns)]))
+        y_min <- floor(min(rel_returns[!is.na(rel_returns)]))
         plot(x=1,y=1, type="n", xlim=c(0,max(periods)), ylim=c(y_min,y_max), axes=FALSE, 
-             xlab=this_year_month, ylab="Total Return (%)") 
+             xlab=this_year_month, ylab="Relative Return (%)") 
         axis(side=1, at=c(0,periods) )
         axis(side=2, at=seq(y_min,y_max,1) )
+        abline(0,0, col="black")
         for(i in 1:nbins){
-            points(c(0,periods), c(0,m[i,]), col=pallet[i])
-            lines(c(0,periods), c(0,m[i,]), col=pallet[i])
+            points(c(0,periods), c(0,rel_returns[i,]), col=pallet[i])
+            lines(c(0,periods), c(0,rel_returns[i,]), col=pallet[i])
         }
-        #Sys.sleep(1)
+        Sys.sleep(1)
     }
 }
 
