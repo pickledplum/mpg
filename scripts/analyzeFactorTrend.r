@@ -12,6 +12,7 @@ source("getCompoundedReturn.r")
 
 logger.init(logger.INFO)
 
+
 # DB connection
 dblocation <- "R:/temp/honda/sqlite-db/japan500-keep/japan500.sqlite"
 #dblocation <- "R:/temp/honda/sqlite-db/sandbox"
@@ -46,6 +47,8 @@ factors <- c("FF_BPS", "P_PRICE_AVG", "P_TOTAL_RETURNC")
 #WARNING: Tthis daily data has taken 6 hours on XP32 w/ 3GB mem
 #total_r <- getBulkTSeries(conn, "R:/temp/honda/sqlite-db/japan500", universe, factors[3], "1980-01-01", "2013-12-31")
 
+browser()
+
 # price to book
 x1 <- dbReadTable(conn, "bulk_FF_BPS")
 bps <- as.xts(x1, as.Date(unjulianday(x1[[1]])))
@@ -71,8 +74,6 @@ logger.info("Closed the db")
 # grab intersection of the two time series (price and book per share) by year and month.
 valid_months <- as.character(intersect(substr(index(price),1,7), substr(index(bps),1,7)))
 
-
-
 oldest_this_year_month <- min(valid_months)
 tokens <- as.integer(strsplit(oldest_this_year_month, "-")[[1]])
 oldest_yy <- tokens[1]
@@ -88,7 +89,7 @@ n_periods <- length(periods)
 
 logger.debug(paste("Valid months: min,max,# - ", paste(oldest_this_year_month, latest_this_year_month, n_periods),sep=","))
 # iterate from the most recent to the oldest
-for( this_year_month in valid_months ){
+for( this_year_month in head(valid_months,20) ){
     logger.info("Processing ", this_year_month, "...")
     
     yy <- rep(0,n_periods)
@@ -131,14 +132,16 @@ for( this_year_month in valid_months ){
         logger.warn("Not enough data.  Bin size is ", nbins, " but there is only ", range, " non-null data points.  Skipping...")
         next
     }
+    percentile_notations <- vector("numeric", nbins)
     h <- as.integer(range/nbins)
     bin_ids <- list()
     sorted_ids <- names(pbk)[sorted_index] 
     for(i in 1:nbins){
         begin <- (i-1) * h + 1
         end <- begin + h - 1
-        bin_ids[[i]] <- sorted_ids[begin:end]      
-        logger.debug("Bin ", as.integer(h*(i-1)/range*100.), " percentile: ", bin_ids[[i]])
+        bin_ids[[i]] <- sorted_ids[begin:end]   
+        percentile_notations[i] <- as.integer(h*(i-1)/range*100.)
+        logger.debug("Bin ", percentile_notations[i], " percentile: ", bin_ids[[i]])
     }
     
     # Will store the returns for the future periods
@@ -214,6 +217,13 @@ for( this_year_month in valid_months ){
         logger.warn("No more ", periods[n_periods], " months in the future.  We are done.")
         break
     }
+    # Report how many stocks in each bin
+    num_companies_in_each_bin <- vector("numeric", nbins)
+    for( bin in 1:nbins ){
+        num_companies_in_each_bin[bin] <- length(bin_ids[[bin]])
+    }
+    logger.info("Number of stocks in bins in ascending order of percentile: ", 
+                paste(num_companies_in_each_bin, collapse=","))
     
     # Compute compounded return upto the period
     #
@@ -271,17 +281,23 @@ for( this_year_month in valid_months ){
     rel_returns <- rel_returns * 100.  # to percent 
     
     if(TRUE) {
-        y_max <- ceiling(max(rel_returns[!is.na(rel_returns)]))
+
+        percentiles <- seq(0, 100-as.integer(100/nbins), as.integer(100/nbins))
+        y_max <- ceiling(max(rel_returns[!is.na(rel_returns)]))+3 # add padding for legend
         y_min <- floor(min(rel_returns[!is.na(rel_returns)]))
         plot(x=1,y=1, type="n", xlim=c(0,max(periods)), ylim=c(y_min,y_max), axes=FALSE, 
-             xlab=this_year_month, ylab="Relative Return (%)") 
+             xlab="Months in Future", ylab="Relative Return (%)") 
         axis(side=1, at=c(0,periods) )
         axis(side=2, at=seq(y_min,y_max,1) )
         abline(0,0, col="black")
         for(i in 1:nbins){
-            points(c(0,periods), c(0,rel_returns[i,]), col=pallet[i])
-            lines(c(0,periods), c(0,rel_returns[i,]), col=pallet[i])
+            points(c(0,periods), c(0,rel_returns[i,]), col=pallet[i], pch="*")
+            lines(c(0,periods), c(0,rel_returns[i,]), col=pallet[i], pch="*")
+            
         }
+        legend("topright", paste(percentiles, "%"), col=pallet[1:nbins], 
+               lty=1:nbins, pch="*", ncol=5)
+        title(main=paste(this_year_month, " - P/B vs Returns"))
         Sys.sleep(1)
     }
 }
