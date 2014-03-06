@@ -19,19 +19,20 @@ logger.close <- function() {
         close(logger.logfile)
     }
 }
-logger.error <- function(msg){
-    logger.logmsg(logger.ERROR, msg)
+
+logger.error <- function(msg, ...){    
+    logger.logmsg(logger.ERROR, msg, ...)
 }
-logger.warn <- function(msg){
-    logger.logmsg(logger.WARN, msg)
+logger.warn <- function(msg, ...){
+    logger.logmsg(logger.WARN, msg, ...)
 }
-logger.info <- function(msg){
-    logger.logmsg(logger.INFO, msg)
+logger.info <- function(msg, ...){
+    logger.logmsg(logger.INFO, msg, ...)
 }
-logger.debug <- function(msg){
-    logger.logmsg(logger.DEBUG, msg)
+logger.debug <- function(msg, ...){
+    logger.logmsg(logger.DEBUG, msg, ...)
 }
-logger.logmsg <- function(level, msg){
+logger.logmsg <- function(level, msg, ...){
     t <- format(Sys.time(), "%Y/%m/%d %H:%M:%S")
     level_str <- ""
     if( level==logger.DEBUG ){
@@ -45,6 +46,10 @@ logger.logmsg <- function(level, msg){
     } else {
         level_str <- "???"
     }
+    
+    extra_args <- list(...)
+    extra_str <- paste(extra_args, collapse="")
+    msg <- paste(msg, extra_str, sep="")
     msggg <- paste(t, level_str, "-", msg)
     if( level >= logger.level ){
         if( !is.null(logger.logfile) ){
