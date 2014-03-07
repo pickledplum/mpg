@@ -30,7 +30,7 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins ){
 
     
     # iterate from the most recent to the oldest
-    for( this_year_month in valid_months ){
+    for( this_year_month in tail(valid_months,20) ){
         logger.info("Processing ", this_year_month, "...")
         
         yy <- rep(0,n_periods)
@@ -91,12 +91,6 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins ){
         names(r0) <- sorted_ids
         #logger.debug("Return on (", this_year_month, ")")
         #print(r0)
-        
-        # Get the price for each company for this month
-        if( is.empty(price[ paste(yy0,mm0,sep="-")] )) {
-            logger.warn("No price data on the reference month.  Skipping...")
-            next
-        } 
     
         # Gather incremental returns by months
         # Example: if periods = c(1,3,6,12) then, 
@@ -231,6 +225,7 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins ){
                    lty=1:nbins, pch="*", ncol=5)
             title(main=paste(this_year_month, " - P/B vs Returns"))
             #Sys.sleep(1)
+            browser()
         }
     }
 }
