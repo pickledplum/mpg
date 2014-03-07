@@ -225,11 +225,6 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
                    lty=1:nbins, pch="*", ncol=5)
             title(main=paste(this_year_month, " - ", factorName, " vs Returns"))
             #Sys.sleep(1)
-<<<<<<< HEAD
-            #browser()
-=======
-            browser()
->>>>>>> 267a4e3dd3af1ae24f0f7e7fa5cf83e133789455
         }
     }
 }

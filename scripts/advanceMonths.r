@@ -4,22 +4,10 @@
     if( N >= 0 ){
         deltaMM <- N %% 12
     } else { # N < 0
-<<<<<<< HEAD
         deltaMM <- -(12 - N %% 12)
         if( mm + deltaMM <= 0 ){
             deltaYY <- deltaYY - 1
             deltaMM <- deltaMM + 12
-=======
-        deltaMM <- N %% 12
-        if( deltaMM > mm ){
-            deltaYY <- deltaYY-1
-        }
-        deltaMM <- (N %% 12)
-        if( deltaMM > mm ){
-            deltaYY <- deltaYY-1
-        } else {
-            deltaMM <- -deltaMM
->>>>>>> 267a4e3dd3af1ae24f0f7e7fa5cf83e133789455
         }
     }
     return(c(yy+deltaYY, mm+deltaMM))
