@@ -13,7 +13,7 @@ source("getCompoundedReturn.r")
 # colors in the order of lower to higher bins
 pallet <- c("dark blue","dark green","yellow","dark orange","dark red")
 
-seeWhatHappens <- function( controlVar, totalR, periods, nbins ){
+seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
    # browser()
     n_periods <- length(periods)
     
@@ -91,12 +91,6 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins ){
         names(r0) <- sorted_ids
         #logger.debug("Return on (", this_year_month, ")")
         #print(r0)
-        
-        # Get the price for each company for this month
-        if( is.empty(price[ paste(yy0,mm0,sep="-")] )) {
-            logger.warn("No price data on the reference month.  Skipping...")
-            next
-        } 
     
         # Gather incremental returns by months
         # Example: if periods = c(1,3,6,12) then, 
@@ -229,8 +223,9 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins ){
             }
             legend("bottom", paste(percentiles, "%"), col=pallet[1:nbins], 
                    lty=1:nbins, pch="*", ncol=5)
-            title(main=paste(this_year_month, " - P/B vs Returns"))
+            title(main=paste(this_year_month, " - ", factorName, " vs Returns"))
             #Sys.sleep(1)
+            #browser()
         }
     }
 }

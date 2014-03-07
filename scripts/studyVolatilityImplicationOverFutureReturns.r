@@ -13,8 +13,8 @@ library(xts)
 source("../dummy/getUniverse.r")
 source("../dummy/getTSeries.r")
 source("logger.r")
-#source("analyzeFactorTrend.r")
 source("seeWhatHappens.r")
+source("computeVolatility.r")
 
 ##############################################################################
 # Configuration - things you want to change
@@ -46,7 +46,7 @@ mkval_min <- -100000
 mkval_year <- 2013
 
 # Base factors to drive what you want
-factors <- c("FF_BPS", "P_PRICE_AVG")
+factors <- c("P_PRICE_AVG")
 
 ##############################################################################
 # Open DB
@@ -58,65 +58,11 @@ logger.info(paste("Opened DB:", file.path(dbdir, dbname)))
 # Define universe
 ##############################################################################
 # Get the universe
-if(do_create_tables){
+if( do_create_tables ){
     universe <- getUniverse(conn, mktval=mkval_min, year=mkval_year)$id
     universe <- tail(universe)
     logger.info(paste("Filtered universe by market value >=", mkval_min, "as of", mkval_year)) 
 }
-##############################################################################
-# Prepare the control variable - do it yourself!
-##############################################################################
-#
-# Consolidate time series into a single big time table 
-# where rows=:this_year_months, cols=:companies
-#
-series <- list()
-if( do_create_tables ){
-    for( factor in factors ){
-        
-        series[[factor]] <- getBulkTSeries(conn, dbdir, universe, factor, begin, end)
-    }
-} else {
-    for( factor in factors ){
-        data <- dbReadTable(conn, paste("bulk_", factor, sep=""))
-        data <- as.xts(data, as.Date(unjulianday(data[[1]])))
-        data$date = NULL
-        series[[factor]] <- data
-    }
-}
-
-# Get rid of companies that don't have all the necessary factors
-common_companies <- intersect(names(series[[factors[1]]]), names(series[[factors[1]]]))
-logger.debug("common companies: ", paste(common_companies,collapse=","))
-# Check if they are empty.  If so, bail out.
-for( factor in factors ){
-    series[[factor]] <- series[[factor]][,common_companies]
-    if( is.empty(series[[factor]]) ){
-        logger.error("No ", factor, " data with common companies.  Bailing out...")
-        stop()
-    }
-}
-# put them together and see if there are still data points.
-common_timestamps <- as.character(intersect(substr(index(series[[factors[1]]]),1,7), substr(index(series[[factors[2]]]),1,7)))
-for( factor in factors ){
-    series[[factor]] <- series[[factor]][common_timestamps,]
-    if( is.empty(series[[factor]]) ){
-        logger.error("No ", factor, " data with common timestamps.  Bailing out...")
-        stop()
-    }
-}
-pbs <- series[[factors[1]]]
-price <- series[[factors[2]]]
-
-# compute the control variable
-book_per_share <- price / pbs
-
-# create a table for that.
-dbSendQuery(conn, "DROP TABLE derived_BOOK_PER_SHARE")
-dbWriteTable(conn, "derived_BOOK_PER_SHARE", as.data.frame(book_per_share))
-data <- dbReadTable(conn, "derived_BOOK_PER_SHARE")
-control_var <- as.xts(data, by=rownames(data))
-
 ##############################################################################
 # Download returns
 ##############################################################################
@@ -134,6 +80,41 @@ if( do_create_return_table ){
     totalR$date = NULL
     totalR <- totalR / 100.  # convert to fraction from percentage
 }
+
+##############################################################################
+# Prepare the control variable - do it yourself!
+##############################################################################
+oldest_date <- min(index(totalR))
+latest_date <- max(index(totalR)) 
+
+oldest_yy <- as.integer(substr(as.character(oldest_date),1,4))
+latest_yy <- as.integer(substr(as.character(latest_date),1,4))
+oldest_mm <- as.integer(substr(as.character(oldest_date),6,7))
+latest_mm <- as.integer(substr(as.character(latest_date),6,7))
+
+sampling_points <- vector("character", (latest_yy-oldest_yy)*12)
+# create a sequence of year-month
+cnt=1
+for( i in 0:(latest_yy-oldest_yy) ){
+    year = oldest_yy + i
+    for( month in 1:12 ){
+        sampling_points[cnt] <- paste(formatC(year,width=4, flag="0"),
+                                      formatC(month, width=2, flag="0"),
+                                      sep="-")
+        cnt = cnt+1
+    }
+}
+
+# compute the control variable
+volatility <- computeVolatility(sampling_points, totalR)
+
+# create a table for that.
+dbSendQuery(conn, "DROP TABLE IF EXISTS derived_VOLATILITY")
+dbWriteTable(conn, "derived_VOLATILITY", as.data.frame(volatility))
+data <- dbReadTable(conn, "derived_VOLATILITY")
+control_var <- volatility
+
+
 ##############################################################################
 # Close DB
 ##############################################################################
@@ -160,7 +141,7 @@ periods <- c(1,3,6,12)
 nbins <- 5
 
 #analyzeFactorTrend(totalR, price, bps, nbins, periods, pallet, c(factors, "P_TOTAL_RETURNC"))
-seeWhatHappens(control_var, totalR, periods, nbins, "P/B")
+seeWhatHappens(control_var, totalR, periods, nbins, "Volatility")
 logger.info("Completed normally.  Good day!")
 logger.close()
 

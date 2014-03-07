@@ -1,27 +1,19 @@
+
 .advanceMonths <- function( yy, mm, N ){
-    deltaYY <- as.integer(N/12)
-    deltaMM <- N %% 12
-    yy <- yy+deltaYY
-    if(N>=0){
-        if( mm + deltaMM > 12 ){
-            yy = yy + 1
-            mm = (mm+deltaMM)-12
-        } else{
-            mm = mm + deltaMM
+    deltaYY <- as.integer(N / 12)
+    if( N >= 0 ){
+        deltaMM <- N %% 12
+    } else { # N < 0
+        deltaMM <- -(12 - N %% 12)
+        if( mm + deltaMM <= 0 ){
+            deltaYY <- deltaYY - 1
+            deltaMM <- deltaMM + 12
         }
-        return( c(yy,mm) )
-    } else {
-        if( mm - deltaMM < 1 ){
-            yy = yy - 1
-            mm = (mm-deltaMM)+12
-        } else{
-            mm = mm - deltaMM
-        }
-        return( c(yy,mm) )
     }
+    return(c(yy+deltaYY, mm+deltaMM))
 }
+
 is.endOfMonth <- function(timestamp){
-    browser()
     tokens <- strsplit(timestamp,'-')[[1]]
     t <- as.integer(tokens)
     if( t[2] == 2 ){

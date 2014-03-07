@@ -1,0 +1,10 @@
+source("advanceMonths.r")
+source("assert.r")
+
+assert.equal("2000-01", advanceMonths("2000-01", 0))
+assert.equal("2000-02", advanceMonths("2000-01", 1))
+assert.equal("2001-01", advanceMonths("2000-01", 12))
+assert.equal("2002-02", advanceMonths("2000-01", 25))
+assert.equal("1999-12", advanceMonths("2000-01", -1))
+assert.equal("2000-01", advanceMonths("2000-12", -11))
+assert.equal("1998-11", advanceMonths("2000-12", -25))
