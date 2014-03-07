@@ -30,7 +30,7 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
 
     
     # iterate from the most recent to the oldest
-    for( this_year_month in valid_months ){
+    for( this_year_month in tail(valid_months,20) ){
         logger.info("Processing ", this_year_month, "...")
         
         yy <- rep(0,n_periods)
@@ -225,7 +225,11 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
                    lty=1:nbins, pch="*", ncol=5)
             title(main=paste(this_year_month, " - ", factorName, " vs Returns"))
             #Sys.sleep(1)
+<<<<<<< HEAD
             #browser()
+=======
+            browser()
+>>>>>>> 267a4e3dd3af1ae24f0f7e7fa5cf83e133789455
         }
     }
 }

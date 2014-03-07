@@ -9,8 +9,11 @@ library(xts)
 library(PerformanceAnalytics)
 source("is.empty.r")
 source("logger.r")
+<<<<<<< HEAD
 source("advanceMonths.r")
 
+=======
+>>>>>>> 267a4e3dd3af1ae24f0f7e7fa5cf83e133789455
 logger.init(logger.DEBUG)
 computeVolatility <- function( sampling_points, returns ){
     nrows <- length(sampling_points)
@@ -31,10 +34,17 @@ computeVolatility <- function( sampling_points, returns ){
             logger.warn("No data for period from ", twelve_months_ago, " to ", point_of_interest)
             next
         }
+<<<<<<< HEAD
         #print(chunk)
         tryCatch({
             m[i,] <- apply(chunk, 2, function(column){
                 annstd <- sd.annualized(column, scale=260)
+=======
+        print(chunk)
+        tryCatch({
+            m[i,] <- apply(chunk, 2, function(column){
+                annstd <- sd.annualized(column, scale=260) * sqrt(260)
+>>>>>>> 267a4e3dd3af1ae24f0f7e7fa5cf83e133789455
                 return(annstd)
                 })
 
@@ -49,3 +59,30 @@ computeVolatility <- function( sampling_points, returns ){
     return(ret)
 }
 
+<<<<<<< HEAD
+=======
+
+
+if(TRUE){
+    timestamps <- c("2010-01-01",
+                    "2010-03-01",
+                    "2010-06-01",
+                    "2010-09-01",
+                    "2010-12-01",
+                    "2011-01-01",
+                    "2011-03-01",
+                    "2011-06-01",
+                    "2011-09-01",
+                    "2011-12-01")
+    
+    # in per cent
+    values <- c(10,10,10,10,10,1,10,10,1,1)
+    
+    data <- data.frame(values)
+    rownames(data) <- timestamps
+    returns <- as.xts(data)
+    
+    ret <- computeVolatility(c("2010-12","2011-12"), returns)
+    print(ret)
+}
+>>>>>>> 267a4e3dd3af1ae24f0f7e7fa5cf83e133789455
