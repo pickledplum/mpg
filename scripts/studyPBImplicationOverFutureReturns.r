@@ -13,20 +13,17 @@ library(xts)
 source("../dummy/getUniverse.r")
 source("../dummy/getTSeries.r")
 source("logger.r")
-#source("analyzeFactorTrend.r")
 source("seeWhatHappens.r")
 
 ##############################################################################
 # Configuration - things you want to change
 ##############################################################################
 
-logger.init(logger.INFO)
+logger.init(logger.DEBUG)
 
 # DB connection
 dbdir <- "R:/temp/honda/sqlite-db/japan500-keep"
 dbname <- "japan500.sqlite"
-#dbdir <- "R:/temp/honda/sqlite-db"
-#dbname <- "sandbox"
 
 # Consolidate series that make up the control variable, and store as a table
 # in the database.  Do this once, and set to FALSE for the subsequent 
@@ -58,7 +55,7 @@ logger.info(paste("Opened DB:", file.path(dbdir, dbname)))
 # Define universe
 ##############################################################################
 # Get the universe
-if(do_create_tables){
+if(FALSE){
     universe <- getUniverse(conn, mktval=mkval_min, year=mkval_year)$id
     universe <- tail(universe)
     logger.info(paste("Filtered universe by market value >=", mkval_min, "as of", mkval_year)) 
@@ -87,7 +84,7 @@ if( do_create_tables ){
 
 # Get rid of companies that don't have all the necessary factors
 common_companies <- intersect(names(series[[factors[1]]]), names(series[[factors[1]]]))
-logger.debug("common companies: ", paste(common_companies,collapse=","))
+#logger.debug("common companies: ", paste(common_companies,collapse=","))
 # Check if they are empty.  If so, bail out.
 for( factor in factors ){
     series[[factor]] <- series[[factor]][,common_companies]
@@ -97,7 +94,8 @@ for( factor in factors ){
     }
 }
 # put them together and see if there are still data points.
-common_timestamps <- as.character(intersect(substr(index(series[[factors[1]]]),1,7), substr(index(series[[factors[2]]]),1,7)))
+common_timestamps <- as.character(intersect(substr(index(series[[factors[1]]]),1,7), 
+                                            substr(index(series[[factors[2]]]),1,7)))
 for( factor in factors ){
     series[[factor]] <- series[[factor]][common_timestamps,]
     if( is.empty(series[[factor]]) ){
@@ -105,6 +103,7 @@ for( factor in factors ){
         stop()
     }
 }
+
 pbs <- series[[factors[1]]]
 price <- series[[factors[2]]]
 
@@ -112,7 +111,7 @@ price <- series[[factors[2]]]
 book_per_share <- price / pbs
 
 # create a table for that.
-dbSendQuery(conn, "DROP TABLE derived_BOOK_PER_SHARE")
+dbSendQuery(conn, "DROP TABLE IF EXISTS derived_BOOK_PER_SHARE")
 dbWriteTable(conn, "derived_BOOK_PER_SHARE", as.data.frame(book_per_share))
 data <- dbReadTable(conn, "derived_BOOK_PER_SHARE")
 control_var <- as.xts(data, by=rownames(data))

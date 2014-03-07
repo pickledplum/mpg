@@ -20,13 +20,11 @@ source("computeVolatility.r")
 # Configuration - things you want to change
 ##############################################################################
 
-logger.init(logger.INFO)
+logger.init(logger.DEBUG)
 
 # DB connection
 dbdir <- "R:/temp/honda/sqlite-db/japan500-keep"
 dbname <- "japan500.sqlite"
-#dbdir <- "R:/temp/honda/sqlite-db"
-#dbname <- "sandbox"
 
 # Consolidate series that make up the control variable, and store as a table
 # in the database.  Do this once, and set to FALSE for the subsequent 
@@ -58,18 +56,13 @@ logger.info(paste("Opened DB:", file.path(dbdir, dbname)))
 # Define universe
 ##############################################################################
 # Get the universe
-<<<<<<< HEAD
+
 if( do_create_tables ){
     universe <- getUniverse(conn, mktval=mkval_min, year=mkval_year)$id
     universe <- tail(universe)
     logger.info(paste("Filtered universe by market value >=", mkval_min, "as of", mkval_year)) 
 }
-=======
-universe <- getUniverse(conn, mktval=mkval_min, year=mkval_year)$id
-universe <- tail(universe)
-logger.info(paste("Filtered universe by market value >=", mkval_min, "as of", mkval_year)) 
 
->>>>>>> 267a4e3dd3af1ae24f0f7e7fa5cf83e133789455
 ##############################################################################
 # Download returns
 ##############################################################################
@@ -148,11 +141,9 @@ periods <- c(1,3,6,12)
 nbins <- 5
 
 #analyzeFactorTrend(totalR, price, bps, nbins, periods, pallet, c(factors, "P_TOTAL_RETURNC"))
-<<<<<<< HEAD
+
 seeWhatHappens(control_var, totalR, periods, nbins, "Volatility")
-=======
-seeWhatHappens(control_var, totalR, periods, nbins)
->>>>>>> 267a4e3dd3af1ae24f0f7e7fa5cf83e133789455
+
 logger.info("Completed normally.  Good day!")
 logger.close()
 

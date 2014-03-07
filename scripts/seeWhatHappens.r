@@ -11,7 +11,7 @@ source("advanceMonths.r")
 source("getCompoundedReturn.r")
 
 # colors in the order of lower to higher bins
-pallet <- c("dark blue","dark green","yellow","dark orange","dark red")
+pallet <- c("blue","dark green","yellow","dark orange","red")
 
 seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
    # browser()
@@ -30,28 +30,28 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
 
     
     # iterate from the most recent to the oldest
-    for( this_year_month in tail(valid_months,20) ){
+    for( this_year_month in valid_months ){
         logger.info("Processing ", this_year_month, "...")
         
         yy <- rep(0,n_periods)
         mm <- rep(0,n_periods)
 
         factor <- as.vector(controlVar[this_year_month])
-        logger.debug("factor: ", paste(factor, collapse=","))
+        #logger.debug("factor: ", paste(factor, collapse=","))
         names(factor) <- colnames(controlVar)
-        logger.debug("Names(factor): ", paste(names(factor), collapse=","))
+        #logger.debug("Names(factor): ", paste(names(factor), collapse=","))
         # Get rid of NAs
         factor <- factor[!is.na(factor)]
         if( is.empty(factor) ){
             logger.warn("No factor data.  Skipping...")
             next
         }
-        logger.debug("factor on ", this_year_month, ":", paste(factor,collapse=","))
+        #logger.debug("factor on ", this_year_month, ":", paste(factor,collapse=","))
         # Sort in the ascending order
         sorted_index <- order(factor, decreasing=FALSE)
         sorted_pbk <- factor[sorted_index]
     
-        logger.debug("Sorted index: ", sorted_index)
+        #logger.debug("Sorted index: ", sorted_index)
         
         # collect points to the companies data in each bin
         range <- length(sorted_pbk)
@@ -68,7 +68,7 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
             end <- begin + h - 1
             bin_ids[[i]] <- sorted_ids[begin:end]   
             percentile_notations[i] <- as.integer(h*(i-1)/range*100.)
-            logger.debug("Bin ", percentile_notations[i], " percentile: ", bin_ids[[i]])
+            #logger.debug("Bin ", percentile_notations[i], " percentile: ", bin_ids[[i]])
         }
         
         # Will store the returns for the future periods
@@ -157,20 +157,24 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
         projectedPrice <- list()
         
         for( period in 1:n_periods ){
+            #ndays <- as.integer(periods[period]*(260/12))
             compoundedR_this_bin <- list()
             for( bin in 1:nbins ){
-                logger.debug(as.integer(h*(bin-1)/range*100.), " percentile")
+                #logger.debug(as.integer(h*(bin-1)/range*100.), " percentile")
                 r <- rep(NA, length(bin_ids[[bin]]))
                 names(r) <- bin_ids[[bin]]
                 for( i in 1:length(bin_ids[[bin]]) ){
                     company <- bin_ids[[bin]][i]
                     returns <- as.vector(dailyR[[period]][,company]) 
-                    # annualize?
-                    #returns <- returns / 260.
-                    logger.debug("Visiting ", company)            
-                    r[i] <- getCompoundedReturn( 1., returns )
+                    #logger.debug("Visiting ", company)            
+                    r[i] <- getCompoundedReturn( 1., returns ) #/ 12. * periods[period]
                 }   
-    
+                if( is.empty(r[!is.na(r)]) ){
+                    logger.warn("No non-NA returns for this bin in period: ", bin, ", ", period)
+                }
+                if(period>1){
+                    r <- r * compoundedR[[period-1]][[bin]]
+                }
                 compoundedR_this_bin[[bin]] = r
                 #logger.debug("Compounded return for bin=", bin, ": ")
                 #print(r)
@@ -178,6 +182,7 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
             compoundedR[[period]] <- compoundedR_this_bin
     
         }
+
         #print(compoundedR)
         # average out across the companies within a bin
         #
@@ -200,31 +205,39 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
         rel_returns <- matrix(NA, nrow=nbins, ncol=n_periods)
         colnames(rel_returns) <- periods
         for ( period in 1:n_periods ) {
-            period_mean[period] <- mean(all_returns[,period])
+            period_mean[period] <- mean(all_returns[,period], na.rm=TRUE)
             rel_returns[,period] <- all_returns[,period] - period_mean[period]
         }
-        
+
+        #print(rel_returns)
         rel_returns <- rel_returns * 100.  # to percent 
         
         if(TRUE) {
-    
-            percentiles <- seq(0, 100-as.integer(100/nbins), as.integer(100/nbins))
-            y_max <- ceiling(max(rel_returns[!is.na(rel_returns)]))+3 # add padding for legend
-            y_min <- floor(min(rel_returns[!is.na(rel_returns)]))
-            plot(x=1,y=1, type="n", xlim=c(0,max(periods)), ylim=c(y_min,y_max), axes=FALSE, 
-                 xlab="Months in Future", ylab="Relative Return (%)") 
-            axis(side=1, at=c(0,periods) )
-            axis(side=2, at=seq(y_min,y_max,1) )
-            abline(0,0, col="black")
-            for(i in 1:nbins){
-                points(c(0,periods), c(0,rel_returns[i,]), col=pallet[i], pch="*")
-                lines(c(0,periods), c(0,rel_returns[i,]), col=pallet[i], pch="*")
+            y <- rel_returns[!is.na(rel_returns)]
+            
+            if( !is.empty(y) ) {
+                percentiles <- seq(0, 100-as.integer(100/nbins), as.integer(100/nbins))
+                y_min <- floor(min(y))
+                y_max <- max(ceiling(max(y)), y_min)
+                logger.debug("y min,max: ", y_min, ",", y_max)
+                plot(x=1,y=1, type="n", xlim=c(0,max(periods)), ylim=c(y_min,y_max), axes=FALSE, 
+                     xlab="Months in Future", ylab="Relative Return (%)") 
                 
+                axis(side=1, at=c(0,periods) )
+                axis(side=2, at=seq(y_min,y_max,1) )
+                abline(0,0, col="black")
+                for(i in 1:nbins){
+                    points(c(0,periods), c(0,rel_returns[i,]), col=pallet[i], pch="*")
+                    lines(c(0,periods), c(0,rel_returns[i,]), col=pallet[i], pch="*")
+                    
+                }
+                legend("bottom", paste(percentiles, "%"), col=pallet[1:nbins], 
+                       lty=1:nbins, pch="*", ncol=5)
+                title(main=paste(this_year_month, " - ", factorName, " vs Returns"))
+                Sys.sleep(1)
+            } else{
+                logger.warn("All Y values are NAs, skipping plotting for ", this_year_month, " ...")
             }
-            legend("bottom", paste(percentiles, "%"), col=pallet[1:nbins], 
-                   lty=1:nbins, pch="*", ncol=5)
-            title(main=paste(this_year_month, " - ", factorName, " vs Returns"))
-            #Sys.sleep(1)
         }
     }
 }

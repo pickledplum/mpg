@@ -3,6 +3,10 @@
     deltaYY <- as.integer(N / 12)
     if( N >= 0 ){
         deltaMM <- N %% 12
+        if( mm + deltaMM > 12 ){
+            deltaYY <- deltaYY + 1
+            deltaMM <- deltaMM - 12
+        }
     } else { # N < 0
         deltaMM <- -(12 - N %% 12)
         if( mm + deltaMM <= 0 ){
