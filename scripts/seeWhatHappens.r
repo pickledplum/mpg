@@ -1,9 +1,17 @@
 #' Mining indicators
 #' 
 library(RSQLite)
-library(psych)
 library(xts)
 
+have_GridExtra = FALSE
+if( "ggplto2" %in% installed.packages()
+    && "gridExtra" %in% installed.packages() ){
+    library(ggplot2)
+    require(gridExtra)
+    have_GridExtra = TRUE
+} else{
+    logger.warn("No ggplot2 or gridExtra packages re installed.  No funcy grid plotting...")
+}
 source("../dummy/getUniverse.r")
 source("../dummy/getTSeries.r")
 source("logger.r")
@@ -166,12 +174,26 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
                 for( i in 1:length(bin_ids[[bin]]) ){
                     company <- bin_ids[[bin]][i]
                     returns <- as.vector(dailyR[[period]][,company]) 
-                    #logger.debug("Visiting ", company)            
+                    #logger.debug("Visiting ", company)   
+                    
+                    ##############################################
+                    # ToDO: Revisit by Sachko, 3/7/2014
+                    #
+                    # Not quite sure what to do with
+                    # "annualization".  Here's the code where
+                    # total returns are compounded upto this 
+                    # month period.  Do I need to divide
+                    # the daily return by 260, or divide the
+                    # M-month compounded R by M/12?
+                    # 
+                    #
+                    ##############################################
                     r[i] <- getCompoundedReturn( 1., returns ) #/ 12. * periods[period]
                 }   
                 if( is.empty(r[!is.na(r)]) ){
                     logger.warn("No non-NA returns for this bin in period: ", bin, ", ", period)
                 }
+                # Compounded upon the previous time period.  
                 if(period>1){
                     r <- r * compoundedR[[period-1]][[bin]]
                 }
@@ -217,8 +239,8 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
             
             if( !is.empty(y) ) {
                 percentiles <- seq(0, 100-as.integer(100/nbins), as.integer(100/nbins))
-                y_min <- floor(min(y))
-                y_max <- max(ceiling(max(y)), y_min)
+                y_min <- -5 #floor(min(y))
+                y_max <- 5 #max(ceiling(max(y)), y_min)
                 logger.debug("y min,max: ", y_min, ",", y_max)
                 plot(x=1,y=1, type="n", xlim=c(0,max(periods)), ylim=c(y_min,y_max), axes=FALSE, 
                      xlab="Months in Future", ylab="Relative Return (%)") 
@@ -234,6 +256,10 @@ seeWhatHappens <- function( controlVar, totalR, periods, nbins, factorName ){
                 legend("bottom", paste(percentiles, "%"), col=pallet[1:nbins], 
                        lty=1:nbins, pch="*", ncol=5)
                 title(main=paste(this_year_month, " - ", factorName, " vs Returns"))
+                
+                
+                
+                # Delay for view
                 Sys.sleep(1)
             } else{
                 logger.warn("All Y values are NAs, skipping plotting for ", this_year_month, " ...")

@@ -7,11 +7,8 @@
 #'
 ##############################################################################
 library(RSQLite)
-library(psych)
 library(xts)
 
-source("../dummy/getUniverse.r")
-source("../dummy/getTSeries.r")
 source("logger.r")
 source("seeWhatHappens.r")
 source("computeVolatility.r")
@@ -46,6 +43,13 @@ mkval_year <- 2013
 # Base factors to drive what you want
 factors <- c("P_PRICE_AVG")
 
+
+# future periods, in month, to project onto
+periods <- c(1,3,6,12)
+
+# Number of bins.  e.g. 5 for quintilizing
+nbins <- 5
+
 ##############################################################################
 # Open DB
 ##############################################################################
@@ -57,7 +61,9 @@ logger.info(paste("Opened DB:", file.path(dbdir, dbname)))
 ##############################################################################
 # Get the universe
 
-if( do_create_tables ){
+if(do_create_tables || do_create_return_table){
+    source("../dummy/getUniverse.r")
+    source("../dummy/getTSeries.r")
     universe <- getUniverse(conn, mktval=mkval_min, year=mkval_year)$id
     universe <- tail(universe)
     logger.info(paste("Filtered universe by market value >=", mkval_min, "as of", mkval_year)) 
@@ -133,14 +139,6 @@ totalR <- totalR[,companies]
 ##############################################################################
 # See the effect of the control variable to the future returns
 ##############################################################################
-
-# future periods, in month, to project onto
-periods <- c(1,3,6,12)
-
-# Number of bins.  e.g. 5 for quintilizing
-nbins <- 5
-
-#analyzeFactorTrend(totalR, price, bps, nbins, periods, pallet, c(factors, "P_TOTAL_RETURNC"))
 
 seeWhatHappens(control_var, totalR, periods, nbins, "Volatility")
 

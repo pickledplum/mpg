@@ -7,11 +7,8 @@
 #'
 ##############################################################################
 library(RSQLite)
-library(psych)
 library(xts)
 
-source("../dummy/getUniverse.r")
-source("../dummy/getTSeries.r")
 source("logger.r")
 source("seeWhatHappens.r")
 
@@ -45,6 +42,12 @@ mkval_year <- 2013
 # Base factors to drive what you want
 factors <- c("FF_BPS", "P_PRICE_AVG")
 
+# future periods, in month, to project onto
+periods <- c(1,3,6,12)
+
+# Number of bins.  e.g. 5 for quintilizing
+nbins <- 5
+
 ##############################################################################
 # Open DB
 ##############################################################################
@@ -55,7 +58,9 @@ logger.info(paste("Opened DB:", file.path(dbdir, dbname)))
 # Define universe
 ##############################################################################
 # Get the universe
-if(FALSE){
+if(do_create_tables || do_create_return_table){
+    source("../dummy/getUniverse.r")
+    source("../dummy/getTSeries.r")
     universe <- getUniverse(conn, mktval=mkval_min, year=mkval_year)$id
     universe <- tail(universe)
     logger.info(paste("Filtered universe by market value >=", mkval_min, "as of", mkval_year)) 
@@ -110,10 +115,14 @@ price <- series[[factors[2]]]
 # compute the control variable
 book_per_share <- price / pbs
 
-# create a table for that.
-dbSendQuery(conn, "DROP TABLE IF EXISTS derived_BOOK_PER_SHARE")
-dbWriteTable(conn, "derived_BOOK_PER_SHARE", as.data.frame(book_per_share))
-data <- dbReadTable(conn, "derived_BOOK_PER_SHARE")
+data <- NULL
+if( do_create_tables ){
+    # create a table for that.
+    dbSendQuery(conn, "DROP TABLE IF EXISTS derived_BOOK_PER_SHARE")
+    dbWriteTable(conn, "derived_BOOK_PER_SHARE", as.data.frame(book_per_share))
+} else {
+    data <- dbReadTable(conn, "derived_BOOK_PER_SHARE")
+}
 control_var <- as.xts(data, by=rownames(data))
 
 ##############################################################################
@@ -152,14 +161,8 @@ totalR <- totalR[,companies]
 # See the effect of the control variable to the future returns
 ##############################################################################
 
-# future periods, in month, to project onto
-periods <- c(1,3,6,12)
-
-# Number of bins.  e.g. 5 for quintilizing
-nbins <- 5
-
-#analyzeFactorTrend(totalR, price, bps, nbins, periods, pallet, c(factors, "P_TOTAL_RETURNC"))
 seeWhatHappens(control_var, totalR, periods, nbins, "P/B")
+
 logger.info("Completed normally.  Good day!")
 logger.close()
 
