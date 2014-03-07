@@ -7,6 +7,12 @@
         if( deltaMM > mm ){
             deltaYY <- deltaYY-1
         }
+        deltaMM <- (N %% 12)
+        if( deltaMM > mm ){
+            deltaYY <- deltaYY-1
+        } else {
+            deltaMM <- -deltaMM
+        }
     }
     return(c(yy+deltaYY, mm+deltaMM))
 }
