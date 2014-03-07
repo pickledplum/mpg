@@ -158,6 +158,8 @@ getTSeries <- function(meta_conn, sub_db, fsid, fql, t0, t1){
 #' 2013-03-31    NA     36273.25
 #' 
 getBulkTSeries <- function(conn, subdir, universe, fql, t0, t1) {
+    logger.debug("db: ", dbGetInfo(conn))
+    logger.debug("subdir: ", subdir)
     j0 <- julianday(as.Date(t0))
     j1 <- julianday(as.Date(t1))
     temptable <- paste("bulk_", fql, sep="")
