@@ -9,6 +9,7 @@ library(xts)
 library(PerformanceAnalytics)
 source("is.empty.r")
 source("logger.r")
+logger.init(logger.DEBUG)
 computeVolatility <- function( sampling_points, returns ){
     nrows <- length(sampling_points)
     ncols <- ncol(returns)
@@ -17,12 +18,18 @@ computeVolatility <- function( sampling_points, returns ){
     rownames(m) <- paste(sampling_points, "-01", sep="")
     colnames(m) <- colnames(returns)
     for( i in 1:nrows ){  
-        t <- sampling_points[i]
-        chunk <- returns[t,]
+        point_of_interest <- sampling_points[i]
+        
+        # prior year data
+        twelve_months_ago <- advanceMonths(point_of_interest, -11)
+        logger.debug("point of interest: ", point_of_interest, ", 12 mons ago: ", twelve_months_ago)
+        chunk <- returns[paste(twelve_months_ago, point_of_interest, sep="/")]
+        
         if( is.empty(chunk) ){
-            logger.warn("No data for period: ", t)
+            logger.warn("No data for period from ", twelve_months_ago, " to ", point_of_interest)
             next
         }
+        print(chunk)
         tryCatch({
             m[i,] <- apply(chunk, 2, function(column){
                 annstd <- sd.annualized(column, scale=260) * sqrt(260)
